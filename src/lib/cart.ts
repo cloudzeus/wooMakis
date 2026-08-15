@@ -7,7 +7,11 @@ export const CART_COOKIE = 'WOOMAKIS_CART'
 const COOKIE_MAX_AGE = 60 * 60 * 24 * 30 // 30 days
 
 export type CartLineView = {
+  /** Identity of the line, not the product: two eyes are two lines. */
+  lineKey: string
   productId: string
+  eye: 'RIGHT' | 'LEFT' | 'BOTH'
+  selections: Record<string, string>
   name: string
   slug: string
   imageUrl: string | null
@@ -99,7 +103,10 @@ export async function readCart(locale = 'el'): Promise<CartView> {
     const t = l.product.translations.find(x => x.locale === locale) ?? l.product.translations[0]
     const unitPrice = Number(l.product.price ?? 0)
     return {
+      lineKey: l.lineKey,
       productId: l.productId,
+      eye: l.eye,
+      selections: (l.selections as Record<string, string> | null) ?? {},
       name: t?.name ?? '—',
       slug: t?.slug ?? '',
       imageUrl: l.product.images[0]?.asset.cdnUrl ?? null,

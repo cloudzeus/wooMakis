@@ -298,6 +298,15 @@ model Cart {
   @@index([customerId])
 }
 
+enum Eye {
+  /// Δεξί, oculus dexter.
+  RIGHT
+  /// Αριστερό, oculus sinister.
+  LEFT
+  /// Non-optical items, or a product with no per-eye choice.
+  BOTH
+}
+
 model CartLine {
   id     String @id @default(cuid())
   cartId String
@@ -305,6 +314,20 @@ model CartLine {
 
   productId String
   product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  /// Contact lenses are prescribed per eye and the two powers usually differ,
+  /// so one product can legitimately appear twice in a cart.
+  eye Eye @default(BOTH)
+
+  /// The chosen attribute values, e.g. {"Ιδιότητα - Βαθμός": "-2.50"}.
+  /// WooCommerce models power as a plain attribute, not a variation, so there
+  /// is no variation id to store; this travels to the order as line-item meta.
+  selections Json?
+
+  /// Deterministic identity for "the same line": product + eye + selections.
+  /// Unique per cart, which is what lets adding the same choice twice increment
+  /// rather than create a second row, while a different power stays separate.
+  lineKey String
 
   quantity Int @default(1)
 
@@ -316,8 +339,9 @@ model CartLine {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  @@unique([cartId, productId])
+  @@unique([cartId, lineKey])
   @@index([cartId])
+  @@index([productId])
 }
 
 // ── Brands ───────────────────────────────────────────────

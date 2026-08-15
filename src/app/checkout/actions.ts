@@ -3,6 +3,7 @@
 import { prisma } from '@/lib/prisma'
 import { readCart } from '@/lib/cart'
 import { createWooOrder, findCustomerIdByEmail, ordersEnabled, type OrderLineInput } from '@/lib/woo/orders'
+import { EYE_LABEL, EYE_SHORT } from '@/lib/lens-attributes'
 
 export type CheckoutForm = {
   firstName: string
@@ -70,7 +71,22 @@ export async function placeOrder(form: CheckoutForm): Promise<CheckoutResult> {
     if (!wooId) {
       return { ok: false, error: `Το προϊόν «${line.name}» δεν είναι διαθέσιμο για παραγγελία.` }
     }
-    lineItems.push({ product_id: wooId, quantity: line.quantity })
+    // WooCommerce models lens power as a plain attribute rather than a
+    // variation, so there is no variation_id to send. The customer's choice
+    // travels as line-item meta, which is what shows on the order.
+    const meta: { key: string; value: string }[] = []
+    if (line.eye !== 'BOTH') {
+      meta.push({ key: 'Μάτι', value: `${EYE_LABEL[line.eye]} (${EYE_SHORT[line.eye]})` })
+    }
+    for (const [k, v] of Object.entries(line.selections)) {
+      meta.push({ key: k.replace(/^Ιδιότητα\s*[-–]\s*/, ''), value: v })
+    }
+
+    lineItems.push({
+      product_id: wooId,
+      quantity: line.quantity,
+      ...(meta.length ? { meta_data: meta } : {}),
+    })
   }
 
   const email = form.email.trim().toLowerCase()

@@ -4,6 +4,8 @@ import Image from 'next/image'
 import Link from 'next/link'
 import { useState, useTransition } from 'react'
 import { addToCart } from '@/app/kalathi/actions'
+import { EyePicker } from '@/components/store/eye-picker'
+import { needsPerEye } from '@/lib/lens-attributes'
 import { ProductCard } from '@/components/store/product-card'
 import { QuickView } from '@/components/store/quick-view'
 import {
@@ -45,6 +47,8 @@ export function ProductView({
   const body = paragraphs(product.description) .length
     ? paragraphs(product.description)
     : paragraphs(product.shortDescription)
+
+  const perEye = needsPerEye(product.attributes)
 
   const discount =
     product.onSale && product.regularPrice && product.price
@@ -153,6 +157,11 @@ export function ProductView({
             )}
 
             {/* Buy */}
+            {perEye ? (
+              <div className="mt-7">
+                <EyePicker product={product} />
+              </div>
+            ) : (
             <div className="mt-7 flex items-center gap-3">
               <div className="flex items-center rounded-full border" style={{ borderColor: HAIRLINE }}>
                 <button
@@ -188,8 +197,9 @@ export function ProductView({
                 {pending ? 'Προσθήκη…' : out ? 'Εξαντλημένο' : 'Προσθήκη στο καλάθι'}
               </button>
             </div>
+            )}
 
-            {msg && (
+            {!perEye && msg && (
               <p
                 role="status"
                 className="mt-4 rounded-xl px-3 py-2 text-[13px]"
@@ -212,7 +222,7 @@ export function ProductView({
               </span>
             </p>
 
-            {product.attributes.length > 0 && (
+            {!perEye && product.attributes.length > 0 && (
               <dl className="mt-7 space-y-4 border-t pt-6" style={{ borderColor: HAIRLINE }}>
                 {product.attributes.map(a => (
                   <div key={a.name}>

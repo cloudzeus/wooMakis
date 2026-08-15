@@ -51,6 +51,12 @@ export type OrderLineInput = {
   /** Set for a variable product's chosen variation. */
   variation_id?: number
   quantity: number
+  /**
+   * Per-line meta shown on the WooCommerce order, e.g. eye and power. Used
+   * because this shop models lens power as an attribute, not a variation, so
+   * there is no variation id that could carry the choice.
+   */
+  meta_data?: { key: string; value: string }[]
 }
 
 export type CreatedOrder = {
