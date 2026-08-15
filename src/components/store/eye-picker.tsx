@@ -3,7 +3,7 @@
 import { useMemo, useState, useTransition } from 'react'
 import { addLinesToCart } from '@/app/kalathi/actions'
 import { CheckCircle, ICON_SM, Minus, Plus, WarningCircle } from './icons'
-import { EYE_SHORT, attrLabel, eyeAttrKey, splitAttributes } from '@/lib/lens-attributes'
+import { EYE_SHORT, attrLabel, defaultSelections, eyeAttrKey, splitAttributes } from '@/lib/lens-attributes'
 import { CREAM, HAIRLINE, INK, INK_FAINT, INK_MUTED, SURFACE, TEAL, TEAL_DEEP } from './tokens'
 import type { StoreProduct } from './types'
 
@@ -18,15 +18,20 @@ import type { StoreProduct } from './types'
  * what makes a different power per eye possible.
  */
 export function EyePicker({ product }: { product: StoreProduct }) {
-  const { perEye, choices, clinical, fixed } = useMemo(
+  const { perEye, choices, fixed } = useMemo(
     () => splitAttributes(product.attributes),
     [product.attributes],
   )
 
-  const [right, setRight] = useState<Record<string, string>>({})
-  const [left, setLeft] = useState<Record<string, string>>({})
+  // Attributes offering a single value are chosen for the customer rather than
+  // hidden: base curve and diameter are fixed on most lenses but still belong
+  // on the order, and asking someone to pick from a list of one is noise.
+  const defaults = useMemo(() => defaultSelections(product.attributes), [product.attributes])
+
+  const [right, setRight] = useState<Record<string, string>>(defaults)
+  const [left, setLeft] = useState<Record<string, string>>(defaults)
   /** Single selections for the whole product, e.g. hat size. */
-  const [picked, setPicked] = useState<Record<string, string>>({})
+  const [picked, setPicked] = useState<Record<string, string>>(defaults)
   const [mirror, setMirror] = useState(true)
   const [pairs, setPairs] = useState(1)
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null)
@@ -55,12 +60,6 @@ export function EyePicker({ product }: { product: StoreProduct }) {
     }
     for (const a of choices) {
       selections[attrLabel(a.name)] = picked[a.name]
-    }
-    // Base curve and diameter identify the lens even when the product offers
-    // only one of each. An order without them cannot be dispensed, so they go
-    // on the line whether or not the customer had anything to pick.
-    for (const a of clinical) {
-      selections[attrLabel(a.name)] = a.options[0]
     }
 
     start(async () => {
@@ -110,47 +109,31 @@ export function EyePicker({ product }: { product: StoreProduct }) {
       )}
 
       {/* Single selections for the whole product, e.g. hat size. */}
-      {choices.map(a => (
-        <label key={a.name} className="block">
-          <span className="mb-1.5 block text-[11px] font-bold uppercase tracking-[0.13em]" style={{ color: INK_MUTED }}>
-            {attrLabel(a.name)}
-          </span>
-          <select
-            value={picked[a.name] ?? ''}
-            disabled={out}
-            onChange={e => setPicked(p => ({ ...p, [a.name]: e.target.value }))}
-            className="h-12 w-full cursor-pointer rounded-full border px-5 text-[14px] outline-none disabled:cursor-not-allowed"
-            style={{
-              borderColor: picked[a.name] ? TEAL : HAIRLINE,
-              background: SURFACE,
-              color: INK,
-            }}
-          >
-            <option value="">Επίλεξε {attrLabel(a.name).toLowerCase()}…</option>
-            {a.options.map(o => <option key={o} value={o}>{o}</option>)}
-          </select>
-        </label>
-      ))}
-
-      {clinical.length > 0 && (
-        <div className="rounded-2xl p-4" style={{ background: SURFACE, border: `1px solid ${TEAL}` }}>
-          <p className="mb-2 text-[11px] font-bold uppercase tracking-[0.13em]" style={{ color: TEAL_DEEP }}>
-            Καταχωρείται στην παραγγελία
-          </p>
-          <dl className="flex flex-wrap gap-x-6 gap-y-2">
-            {clinical.map(a => (
-              <div key={a.name} className="flex items-baseline gap-2">
-                <dt className="text-[11px] uppercase tracking-[0.1em]" style={{ color: INK_MUTED }}>
-                  {attrLabel(a.name)}
-                </dt>
-                <dd className="text-[13px] font-semibold tabular-nums" style={{ color: INK }}>
-                  {a.options[0]}
-                </dd>
-              </div>
-            ))}
-          </dl>
-        </div>
-      )}
+      {choices.map(a => {
+        const only = a.options.length === 1
+        return (
+          <label key={a.name} className="block">
+            <span className="mb-1.5 flex items-baseline gap-2 text-[11px] font-bold uppercase tracking-[0.13em]" style={{ color: INK_MUTED }}>
+              {attrLabel(a.name)}
+              {only && <span className="font-medium normal-case tracking-normal" style={{ color: INK_FAINT }}>σταθερό</span>}
+            </span>
+            <select
+              value={picked[a.name] ?? ''}
+              disabled={out || only}
+              onChange={e => setPicked(p => ({ ...p, [a.name]: e.target.value }))}
+              className="h-12 w-full cursor-pointer rounded-full border px-5 text-[14px] outline-none disabled:cursor-default disabled:opacity-100"
+              style={{
+                borderColor: !only && picked[a.name] ? TEAL : HAIRLINE,
+                background: only ? CREAM : SURFACE,
+                color: INK,
+              }}
+            >
+              {!only && <option value="">Επίλεξε {attrLabel(a.name).toLowerCase()}…</option>}
+              {a.options.map(o => <option key={o} value={o}>{o}</option>)}
+            </select>
+          </label>
+        )
+      })}
 
       {fixed.length > 0 && (
         <dl className="flex flex-wrap gap-x-6 gap-y-2 rounded-2xl p-4" style={{ background: CREAM }}>
@@ -241,27 +224,34 @@ function EyeColumn({
       {hint && <p className="mt-0.5 text-[11.5px]" style={{ color: INK_FAINT }}>{hint}</p>}
 
       <div className="mt-3 space-y-2.5">
-        {attrs.map(a => (
-          <label key={a.name} className="block">
-            <span className="mb-1 block text-[10.5px] font-bold uppercase tracking-[0.1em]" style={{ color: INK_MUTED }}>
-              {attrLabel(a.name)}
-            </span>
-            <select
-              value={values[a.name] ?? ''}
-              disabled={disabled}
-              onChange={e => onChange(a.name, e.target.value)}
-              className="h-11 w-full cursor-pointer rounded-full border px-4 text-[14px] tabular-nums outline-none disabled:cursor-not-allowed disabled:opacity-70"
-              style={{
-                borderColor: values[a.name] ? TEAL : HAIRLINE,
-                background: SURFACE,
-                color: INK,
-              }}
-            >
-              <option value="">Επίλεξε…</option>
-              {a.options.map(o => <option key={o} value={o}>{o}</option>)}
-            </select>
-          </label>
-        ))}
+        {attrs.map(a => {
+          // One option means the value is a property of the lens, not a
+          // decision. It stays visible and still reaches the order, but there
+          // is no empty state to escape from.
+          const only = a.options.length === 1
+          return (
+            <label key={a.name} className="block">
+              <span className="mb-1 flex items-baseline gap-1.5 text-[10.5px] font-bold uppercase tracking-[0.1em]" style={{ color: INK_MUTED }}>
+                {attrLabel(a.name)}
+                {only && <span className="font-medium normal-case tracking-normal" style={{ color: INK_FAINT }}>σταθερό</span>}
+              </span>
+              <select
+                value={values[a.name] ?? ''}
+                disabled={disabled || only}
+                onChange={e => onChange(a.name, e.target.value)}
+                className="h-11 w-full cursor-pointer rounded-full border px-4 text-[14px] tabular-nums outline-none disabled:cursor-default disabled:opacity-100"
+                style={{
+                  borderColor: only ? HAIRLINE : values[a.name] ? TEAL : HAIRLINE,
+                  background: only ? CREAM : SURFACE,
+                  color: INK,
+                }}
+              >
+                {!only && <option value="">Επίλεξε…</option>}
+                {a.options.map(o => <option key={o} value={o}>{o}</option>)}
+              </select>
+            </label>
+          )
+        })}
       </div>
     </div>
   )

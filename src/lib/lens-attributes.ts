@@ -53,13 +53,10 @@ const SPEC_ONLY = ['διάρκεια', 'τύπος', 'υλικό', 'διαπερ
 export type ProductAttribute = { name: string; options: string[] }
 
 export type AttributeSplit = {
+  /** Prescription fields, presented once per eye. */
   perEye: ProductAttribute[]
+  /** One selection for the whole product: hat size, frame colour. */
   choices: ProductAttribute[]
-  /**
-   * Single-valued clinical specs. Nothing to choose, but they must appear on
-   * the cart line and therefore in the WooCommerce order.
-   */
-  clinical: ProductAttribute[]
   /** Descriptive. Shown on the page, never recorded on the order. */
   fixed: ProductAttribute[]
 }
@@ -85,23 +82,19 @@ export function splitAttributes(attributes: ProductAttribute[]): AttributeSplit 
 
   const perEye: ProductAttribute[] = []
   const choices: ProductAttribute[] = []
-  const clinical: ProductAttribute[] = []
   const fixed: ProductAttribute[] = []
 
   for (const a of usable) {
+    // Descriptive attributes are never asked for, on this site or on the live
+    // one: lens material and wear duration are properties of the product, not
+    // decisions the customer makes.
     if (matches(a.name, SPEC_ONLY)) { fixed.push(a); continue }
 
-    const single = a.options.length === 1
-
-    if (isLens && matches(a.name, CLINICAL)) {
-      // Multi-valued base curve is a genuine per-eye choice (16 products);
-      // single-valued is attached to the line without asking.
-      if (single) clinical.push(a)
-      else perEye.push(a)
-      continue
-    }
-
-    if (single) { fixed.push(a); continue }
+    // Every remaining attribute becomes a selection with that product's own
+    // options, including the ones offering a single value. A one-option field
+    // is still shown and still recorded — base curve and diameter are fixed on
+    // most lenses yet must appear on the order — and it is preselected so the
+    // customer is not asked to confirm a choice they do not have.
     if (isLens && matches(a.name, PRESCRIPTION)) perEye.push(a)
     else choices.push(a)
   }
@@ -109,19 +102,20 @@ export function splitAttributes(attributes: ProductAttribute[]): AttributeSplit 
   // Same sequence the live mylens.gr prescription form uses, so an order reads
   // the way the fulfilment team already expects it to.
   perEye.sort((a, b) => lensFieldOrder(a.name) - lensFieldOrder(b.name))
-  clinical.sort((a, b) => lensFieldOrder(a.name) - lensFieldOrder(b.name))
 
-  return { perEye, choices, clinical, fixed }
+  return { perEye, choices, fixed }
 }
 
 /**
- * The auto-attached clinical values for a line, keyed as they should read on
- * the order. Same value for both eyes, so no eye suffix.
+ * Values to start the form with: every attribute that offers exactly one
+ * option, already chosen. Keyed by attribute name, so it seeds both eyes and
+ * the product-level choices from the same map.
  */
-export function clinicalSelections(attributes: ProductAttribute[]): Record<string, string> {
+export function defaultSelections(attributes: ProductAttribute[]): Record<string, string> {
+  const { perEye, choices } = splitAttributes(attributes)
   const out: Record<string, string> = {}
-  for (const a of splitAttributes(attributes).clinical) {
-    out[attrLabel(a.name)] = a.options[0]
+  for (const a of [...perEye, ...choices]) {
+    if (a.options.length === 1) out[a.name] = a.options[0]
   }
   return out
 }
