@@ -7,6 +7,17 @@ import { WebhookPanel, type WebhookStats } from './webhook-panel'
 
 export const dynamic = 'force-dynamic'
 
+/**
+ * The address WooCommerce actually calls.
+ *
+ * NOT AUTH_URL — that is localhost in development, and printing it here would
+ * hand the operator a URL that can never receive a delivery.
+ */
+function publicOrigin(): string {
+  const url = process.env.PUBLIC_SITE_URL ?? process.env.AUTH_URL ?? ''
+  return url.replace(/\/+$/, '')
+}
+
 const OUTCOME: Record<string, { icon: string; label: string; cls: string }> = {
   SUCCESS: { icon: '✓', label: 'Επιτυχία', cls: 'bg-[var(--success)]/12 text-[var(--success)]' },
   PARTIAL: { icon: '◐', label: 'Μερική',   cls: 'bg-[var(--warning)]/12 text-[var(--warning)]' },
@@ -129,7 +140,7 @@ export default async function SyncPage() {
 
       <WebhookPanel
         stats={webhookStats}
-        endpoint={`${process.env.AUTH_URL ?? ''}/api/webhooks/woocommerce`}
+        endpoint={`${publicOrigin()}/api/webhooks/woo`}
         configured={!!process.env.WOO_WEBHOOK_SECRET}
         canRun={can(session, 'sync.run')}
       />

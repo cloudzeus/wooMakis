@@ -83,7 +83,7 @@ export async function POST(request: Request) {
 /** A GET makes it easy to confirm the endpoint is reachable before wiring it up. */
 export async function GET() {
   return Response.json({
-    endpoint: 'woocommerce',
+    endpoint: 'woo',
     configured: !!process.env.WOO_WEBHOOK_SECRET,
     method: 'POST only',
   })
