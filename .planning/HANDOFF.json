@@ -1,0 +1,78 @@
+{
+  "version": "1.0",
+  "timestamp": "2026-08-15T06:20:06.531Z",
+  "source": "auto-postool",
+  "partial": false,
+  "phase": null,
+  "phase_name": null,
+  "phase_dir": null,
+  "plan": null,
+  "task": null,
+  "total_tasks": null,
+  "status": "auto-checkpoint",
+  "completed_tasks": [],
+  "remaining_tasks": [],
+  "blockers": [],
+  "human_actions_pending": [],
+  "decisions": [],
+  "uncommitted_files": [
+    {
+      "status": "??",
+      "path": ".env.example"
+    },
+    {
+      "status": "??",
+      "path": ".planning/"
+    },
+    {
+      "status": "??",
+      "path": "AGENTS.md"
+    },
+    {
+      "status": "??",
+      "path": "CLAUDE.md"
+    },
+    {
+      "status": "??",
+      "path": "README.md"
+    },
+    {
+      "status": "??",
+      "path": "eslint.config.mjs"
+    },
+    {
+      "status": "??",
+      "path": "next-env.d.ts"
+    },
+    {
+      "status": "??",
+      "path": "next.config.ts"
+    },
+    {
+      "status": "??",
+      "path": "package-lock.json"
+    },
+    {
+      "status": "??",
+      "path": "package.json"
+    },
+    {
+      "status": "??",
+      "path": "postcss.config.mjs"
+    },
+    {
+      "status": "??",
+      "path": "public/"
+    },
+    {
+      "status": "??",
+      "path": "src/"
+    },
+    {
+      "status": "??",
+      "path": "tsconfig.json"
+    }
+  ],
+  "next_action": null,
+  "context_notes": "Recent commits:\n59b8da0 Add phase 1 foundation implementation plan\n1d176e0 Add wooMakis design spec"
+}
