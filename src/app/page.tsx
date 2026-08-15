@@ -4,9 +4,13 @@ import { prisma } from '@/lib/prisma'
 import { readCartCount } from '@/lib/cart'
 import { StoreFooter, StoreHeader } from '@/components/store/store-header'
 import { HomeShowcase } from './home-showcase'
+import { HeroMotion } from '@/components/store/hero-motion'
+import { Marquee } from '@/components/store/marquee'
+import { PromoBanners, type BannerCat } from '@/components/store/promo-banners'
+import { Reveal } from '@/components/store/reveal'
 import {
-  CREAM, HAIRLINE, INK, INK_MUTED, PANEL, PANEL_HI,
-  R_CARD, SURFACE_PRODUCT, TEAL, TEAL_DEEP,
+  CANVAS, CREAM, HAIRLINE, INK, INK_FAINT, INK_MUTED,
+  R_CARD, SURFACE, SURFACE_PRODUCT, TEAL, TEAL_DEEP,
 } from '@/components/store/tokens'
 import type { StoreProduct } from '@/components/store/types'
 
@@ -15,7 +19,7 @@ export const dynamic = 'force-dynamic'
 type WooAttribute = { name?: string; options?: string[] }
 
 export default async function HomePage() {
-  const [rows, categories, productCount, cartCount, brands] = await Promise.all([
+  const [rows, categories, productCount, cartCount, brands, bannerRows] = await Promise.all([
     prisma.product.findMany({
       where: { status: 'publish', images: { some: {} } },
       orderBy: [{ featured: 'desc' }, { totalSales: 'desc' }],
@@ -39,6 +43,20 @@ export default async function HomePage() {
       orderBy: { count: 'desc' },
       take: 16,
       include: { translations: true },
+    }),
+    // One representative product image per category, for the banner band.
+    prisma.category.findMany({
+      orderBy: { count: 'desc' },
+      take: 6,
+      include: {
+        translations: true,
+        _count: { select: { products: true } },
+        products: {
+          take: 1,
+          where: { product: { images: { some: {} }, status: 'publish' } },
+          include: { product: { include: { images: { include: { asset: true }, take: 1 } } } },
+        },
+      },
     }),
   ])
 
@@ -70,23 +88,31 @@ export default async function HomePage() {
     }
   })
 
+  const bannerCats: BannerCat[] = bannerRows.map(c => ({
+    name: pick(c.translations)?.name ?? '—',
+    count: c._count.products,
+    imageUrl: c.products[0]?.product.images[0]?.asset.cdnUrl ?? null,
+  }))
+
   const hero = products[0]
 
   return (
-    <div className="min-h-dvh font-store" style={{ background: INK }}>
+    <div className="min-h-dvh font-store" style={{ background: CANVAS }}>
       <StoreHeader cartCount={cartCount} />
 
       <main className="mx-auto max-w-[1440px] px-5 pb-24 pt-5 sm:px-8">
         {/* ── Hero bento: 7/5 split, staggered heights for rhythm ── */}
+        <HeroMotion>
         <section className="grid gap-3 lg:grid-cols-12">
           <div
+            data-hero="1"
             className="flex flex-col justify-between p-8 sm:p-11 lg:col-span-7"
-            style={{ background: CREAM, borderRadius: R_CARD }}
+            style={{ background: SURFACE, borderRadius: R_CARD }}
           >
             <div>
               <span
                 className="inline-flex items-center gap-2 rounded-full px-3.5 py-1.5 text-[10.5px] font-bold uppercase tracking-[0.15em]"
-                style={{ background: INK, color: CREAM }}
+                style={{ background: INK, color: '#fff' }}
               >
                 <span className="h-1.5 w-1.5 rounded-full" style={{ background: TEAL }} />
                 Επίσημος διανομέας
@@ -110,7 +136,7 @@ export default async function HomePage() {
               <Link
                 href="/proionta"
                 className="rounded-full px-8 py-4 text-sm font-bold transition-transform motion-safe:hover:-translate-y-0.5"
-                style={{ background: INK, color: CREAM }}
+                style={{ background: INK, color: '#fff' }}
               >
                 Δες όλα τα προϊόντα
               </Link>
@@ -129,6 +155,7 @@ export default async function HomePage() {
             {hero && (
               <Link
                 href="/proionta"
+                data-hero="2"
                 className="group relative block overflow-hidden"
                 style={{ background: SURFACE_PRODUCT, borderRadius: R_CARD }}
               >
@@ -175,20 +202,48 @@ export default async function HomePage() {
                 { n: brands.length, l: 'Μάρκες' },
                 { n: categories.length, l: 'Κατηγορίες' },
               ].map(s => (
-                <div key={s.l} className="px-3 py-7 text-center" style={{ background: PANEL, borderRadius: R_CARD }}>
-                  <p className="text-[32px] font-extrabold leading-none tabular-nums text-white">{s.n}</p>
-                  <p className="mt-2 text-[10.5px] font-semibold uppercase tracking-[0.11em] text-white/40">{s.l}</p>
+                <div key={s.l} data-hero="3" className="px-3 py-7 text-center" style={{ background: SURFACE, borderRadius: R_CARD }}>
+                  <p className="text-[32px] font-extrabold leading-none tabular-nums" style={{ color: INK }}>{s.n}</p>
+                  <p className="mt-2 text-[10.5px] font-semibold uppercase tracking-[0.11em]" style={{ color: INK_MUTED }}>{s.l}</p>
                 </div>
               ))}
             </div>
           </div>
         </section>
+        </HeroMotion>
+
+        {/* ── Promo ticker ── */}
+        <Marquee
+          className="mt-3 py-4"
+          speed={34}
+          itemClassName="shrink-0"
+          items={[
+            'Δωρεάν αποστολή άνω των 40 €',
+            'Γνήσια προϊόντα',
+            'Επίσημος διανομέας',
+            'Αποστολή σε 1–3 ημέρες',
+            'Υποστήριξη από οπτικούς',
+            'Ασφαλής πληρωμή',
+          ].map(t => (
+            <span
+              key={t}
+              className="inline-flex items-center gap-3 whitespace-nowrap rounded-full px-6 py-3 text-[13px] font-semibold"
+              style={{ background: SURFACE, color: INK, border: `1px solid ${HAIRLINE}` }}
+            >
+              <span aria-hidden style={{ color: TEAL_DEEP }}>✦</span>
+              {t}
+            </span>
+          ))}
+        />
+
+        {/* ── Category banners ── */}
+        <PromoBanners cats={bannerCats} />
 
         {/* ── Products ── */}
         <HomeShowcase products={products} />
 
         {/* ── Editorial + categories ── */}
-        <section className="mt-3 grid gap-3 lg:grid-cols-12">
+        <Reveal className="mt-3 grid gap-3 lg:grid-cols-12" as="section" stagger={0.1}>
           <div
             className="flex flex-col justify-between p-8 sm:p-11 lg:col-span-4"
             style={{ background: TEAL, borderRadius: R_CARD }}
@@ -216,10 +271,10 @@ export default async function HomePage() {
             </ul>
           </div>
 
-          <div className="p-8 sm:p-11 lg:col-span-8" style={{ background: PANEL, borderRadius: R_CARD }}>
+          <div className="p-8 sm:p-11 lg:col-span-8" style={{ background: SURFACE, borderRadius: R_CARD }}>
             <div className="mb-7 flex items-end justify-between gap-4">
-              <h2 className="text-[26px] font-extrabold tracking-[-0.025em] text-white">Κατηγορίες</h2>
-              <Link href="/proionta" className="text-[13px] text-white/50 transition-colors hover:text-white">
+              <h2 className="text-[26px] font-extrabold tracking-[-0.025em]" style={{ color: INK }}>Κατηγορίες</h2>
+              <Link href="/proionta" className="text-[13px] transition-colors hover:text-black" style={{ color: INK_MUTED }}>
                 Όλα →
               </Link>
             </div>
@@ -229,19 +284,19 @@ export default async function HomePage() {
                   <Link
                     href="/proionta#katigories"
                     className="flex items-center justify-between rounded-2xl px-5 py-4 transition-colors"
-                    style={{ background: PANEL_HI }}
+                    style={{ background: CANVAS }}
                   >
-                    <span className="text-[14px] text-white/90">{pick(c.translations)?.name ?? '—'}</span>
-                    <span className="text-[12px] tabular-nums text-white/35">{c._count.products}</span>
+                    <span className="text-[14px]" style={{ color: INK }}>{pick(c.translations)?.name ?? '—'}</span>
+                    <span className="text-[12px] tabular-nums" style={{ color: INK_FAINT }}>{c._count.products}</span>
                   </Link>
                 </li>
               ))}
             </ul>
           </div>
-        </section>
+        </Reveal>
 
         {/* ── Brands ── */}
-        <section className="mt-3 p-8 sm:p-11" style={{ background: CREAM, borderRadius: R_CARD }}>
+        <section className="mt-3 p-8 sm:p-11" style={{ background: SURFACE, borderRadius: R_CARD }}>
           <h2 className="mb-6 text-[26px] font-extrabold tracking-[-0.025em]" style={{ color: INK }}>
             Μάρκες
           </h2>

@@ -4,7 +4,7 @@ import Link from 'next/link'
 import { useState } from 'react'
 import { ProductCard } from '@/components/store/product-card'
 import { QuickView } from '@/components/store/quick-view'
-import { CREAM, INK, INK_MUTED, R_CARD } from '@/components/store/tokens'
+import { INK, INK_MUTED, R_CARD, SURFACE } from '@/components/store/tokens'
 import type { StoreProduct } from '@/components/store/types'
 
 /** Home product strip. Client-side only because quick view needs local state. */
@@ -12,7 +12,7 @@ export function HomeShowcase({ products }: { products: StoreProduct[] }) {
   const [quick, setQuick] = useState<StoreProduct | null>(null)
 
   return (
-    <section className="mt-3 p-8 sm:p-11" style={{ background: CREAM, borderRadius: R_CARD }}>
+    <section className="mt-3 p-8 sm:p-11" style={{ background: SURFACE, borderRadius: R_CARD }}>
       <div className="mb-8 flex flex-wrap items-end justify-between gap-5">
         <h2
           className="text-[clamp(28px,4vw,38px)] font-extrabold leading-[0.95] tracking-[-0.035em]"

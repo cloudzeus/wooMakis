@@ -2,7 +2,7 @@ import type { Metadata } from 'next'
 import { prisma } from '@/lib/prisma'
 import { readCartCount } from '@/lib/cart'
 import { StoreFooter, StoreHeader } from '@/components/store/store-header'
-import { INK } from '@/components/store/tokens'
+import { CANVAS, INK, INK_MUTED, TEAL_DEEP } from '@/components/store/tokens'
 import type { StoreProduct } from '@/components/store/types'
 import { Catalog } from './catalog'
 
@@ -74,18 +74,18 @@ export default async function ProductsPage() {
   const brands = tally(products.map(p => p.brand).filter((b): b is string => !!b))
 
   return (
-    <div className="min-h-dvh font-store" style={{ background: INK }}>
+    <div className="min-h-dvh font-store" style={{ background: CANVAS }}>
       <StoreHeader cartCount={cartCount} />
 
       <main className="mx-auto max-w-[1440px] px-5 pb-24 pt-10 sm:px-8">
         <div className="mb-8">
-          <p className="text-[11px] font-bold uppercase tracking-[0.16em]" style={{ color: '#00CFC9' }}>
+          <p className="text-[11px] font-bold uppercase tracking-[0.16em]" style={{ color: TEAL_DEEP }}>
             Κατάλογος
           </p>
-          <h1 className="mt-2 text-[40px] font-extrabold leading-[0.95] tracking-[-0.035em] text-white sm:text-[56px]">
+          <h1 className="mt-2 text-[40px] font-extrabold leading-[0.95] tracking-[-0.035em] sm:text-[56px]" style={{ color: INK }}>
             Όλα τα προϊόντα
           </h1>
-          <p className="mt-3 max-w-lg text-[15px] leading-relaxed text-white/55">
+          <p className="mt-3 max-w-lg text-[15px] leading-relaxed" style={{ color: INK_MUTED }}>
             {products.length} προϊόντα σε {categories.length} κατηγορίες από {brands.length} μάρκες.
             Πάτα «Γρήγορη προβολή» για λεπτομέρειες χωρίς να φύγεις από τη λίστα.
           </p>

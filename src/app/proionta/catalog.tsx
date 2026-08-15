@@ -3,12 +3,10 @@
 import { useMemo, useState } from 'react'
 import { ProductCard } from '@/components/store/product-card'
 import { QuickView } from '@/components/store/quick-view'
-import { CREAM, HAIRLINE_DARK, INK, PANEL, TEAL } from '@/components/store/tokens'
+import { CREAM, HAIRLINE, INK, INK_FAINT, INK_MUTED, SURFACE, TEAL } from '@/components/store/tokens'
 import type { StoreProduct } from '@/components/store/types'
 
 type Facet = { name: string; count: number }
-
-const PAGE = 24
 
 export function Catalog({
   products, categories, brands,
@@ -21,7 +19,6 @@ export function Catalog({
   const [cat, setCat] = useState<string | null>(null)
   const [brand, setBrand] = useState<string | null>(null)
   const [sort, setSort] = useState<'popular' | 'price-asc' | 'price-desc' | 'name'>('popular')
-  const [shown, setShown] = useState(PAGE)
   const [quick, setQuick] = useState<StoreProduct | null>(null)
 
   const filtered = useMemo(() => {
@@ -39,11 +36,12 @@ export function Catalog({
     return sorted
   }, [products, query, cat, brand, sort])
 
-  const visible = filtered.slice(0, shown)
+  // The whole catalogue renders at once — ~208 cards is well inside what the
+  // browser handles comfortably, and it means Cmd-F finds every product.
   const activeFilters = [cat, brand].filter(Boolean).length
 
   function reset() {
-    setCat(null); setBrand(null); setQuery(''); setShown(PAGE)
+    setCat(null); setBrand(null); setQuery('')
   }
 
   return (
@@ -51,17 +49,17 @@ export function Catalog({
       {/* Toolbar */}
       <div
         className="sticky top-[72px] z-20 -mx-5 mb-6 border-b px-5 py-3 backdrop-blur-md sm:-mx-8 sm:px-8"
-        style={{ background: 'rgb(11 15 16 / 88%)', borderColor: HAIRLINE_DARK }}
+        style={{ background: 'rgb(242 241 237 / 92%)', borderColor: HAIRLINE }}
       >
         <div className="flex flex-wrap items-center gap-2.5">
           <label className="relative flex-1 min-w-[200px]">
             <span className="sr-only">Αναζήτηση προϊόντων</span>
             <input
               value={query}
-              onChange={e => { setQuery(e.target.value); setShown(PAGE) }}
+              onChange={e => setQuery(e.target.value)}
               placeholder="Αναζήτηση προϊόντος, μάρκας, SKU…"
-              className="h-11 w-full rounded-full border bg-transparent px-5 text-sm text-white outline-none transition-colors placeholder:text-white/35 focus:border-white/40"
-              style={{ borderColor: 'rgb(255 255 255 / 14%)' }}
+              className="h-11 w-full rounded-full border px-5 text-sm outline-none transition-colors focus:border-black/40"
+              style={{ borderColor: HAIRLINE, background: SURFACE, color: INK }}
             />
           </label>
 
@@ -69,13 +67,13 @@ export function Catalog({
             value={sort}
             onChange={e => setSort(e.target.value as typeof sort)}
             aria-label="Ταξινόμηση"
-            className="h-11 cursor-pointer rounded-full border bg-transparent px-4 text-sm text-white/85 outline-none"
-            style={{ borderColor: 'rgb(255 255 255 / 14%)' }}
+            className="h-11 cursor-pointer rounded-full border px-4 text-sm outline-none"
+            style={{ borderColor: HAIRLINE, background: SURFACE, color: INK }}
           >
-            <option value="popular" style={{ color: '#000' }}>Δημοφιλή</option>
-            <option value="price-asc" style={{ color: '#000' }}>Τιμή: αύξουσα</option>
-            <option value="price-desc" style={{ color: '#000' }}>Τιμή: φθίνουσα</option>
-            <option value="name" style={{ color: '#000' }}>Αλφαβητικά</option>
+            <option value="popular">Δημοφιλή</option>
+            <option value="price-asc">Τιμή: αύξουσα</option>
+            <option value="price-desc">Τιμή: φθίνουσα</option>
+            <option value="name">Αλφαβητικά</option>
           </select>
 
           {activeFilters > 0 && (
@@ -88,7 +86,7 @@ export function Catalog({
             </button>
           )}
 
-          <span className="ml-auto text-[13px] tabular-nums text-white/45">
+          <span className="ml-auto text-[13px] tabular-nums" style={{ color: INK_MUTED }}>
             {filtered.length} προϊόντα
           </span>
         </div>
@@ -98,49 +96,37 @@ export function Catalog({
         {/* Facets */}
         <aside className="space-y-5 lg:sticky lg:top-[148px] lg:h-fit">
           <Facets id="katigories" title="Κατηγορίες" items={categories} active={cat}
-                  onPick={v => { setCat(v); setShown(PAGE) }} />
+                  onPick={setCat} />
           <Facets id="markes" title="Μάρκες" items={brands} active={brand}
-                  onPick={v => { setBrand(v); setShown(PAGE) }} />
+                  onPick={setBrand} />
         </aside>
 
         {/* Grid */}
         <div>
-          {visible.length === 0 ? (
+          {filtered.length === 0 ? (
             <div
               className="grid place-items-center rounded-3xl px-6 py-24 text-center"
-              style={{ background: PANEL }}
+              style={{ background: CREAM }}
             >
-              <p className="text-lg text-white">Δεν βρέθηκαν προϊόντα.</p>
-              <p className="mt-2 max-w-sm text-sm text-white/50">
+              <p className="text-lg font-semibold" style={{ color: INK }}>Δεν βρέθηκαν προϊόντα.</p>
+              <p className="mt-2 max-w-sm text-sm" style={{ color: INK_MUTED }}>
                 Δοκίμασε διαφορετική αναζήτηση ή καθάρισε τα φίλτρα.
               </p>
               <button onClick={reset}
                       className="mt-6 cursor-pointer rounded-full px-6 py-3 text-sm font-semibold"
-                      style={{ background: CREAM, color: INK }}>
+                      style={{ background: INK, color: '#fff' }}>
                 Καθαρισμός φίλτρων
               </button>
             </div>
           ) : (
             <>
               <ul className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-3 xl:grid-cols-4">
-                {visible.map((p, i) => (
+                {filtered.map((p, i) => (
                   <li key={p.id}>
                     <ProductCard product={p} onQuickView={setQuick} priority={i < 4} />
                   </li>
                 ))}
               </ul>
-
-              {shown < filtered.length && (
-                <div className="mt-8 flex justify-center">
-                  <button
-                    onClick={() => setShown(s => s + PAGE)}
-                    className="cursor-pointer rounded-full border px-8 py-3.5 text-sm font-semibold text-white transition-colors hover:border-white/50"
-                    style={{ borderColor: 'rgb(255 255 255 / 18%)' }}
-                  >
-                    Περισσότερα ({filtered.length - shown})
-                  </button>
-                </div>
-              )}
             </>
           )}
         </div>
@@ -158,8 +144,8 @@ function Facets({
   active: string | null; onPick: (v: string | null) => void
 }) {
   return (
-    <section id={id} className="rounded-3xl p-5" style={{ background: PANEL }}>
-      <h2 className="mb-3 text-[11px] font-bold uppercase tracking-[0.14em] text-white/45">{title}</h2>
+    <section id={id} className="rounded-3xl p-5" style={{ background: SURFACE }}>
+      <h2 className="mb-3 text-[11px] font-bold uppercase tracking-[0.14em]" style={{ color: INK_MUTED }}>{title}</h2>
       <ul className="space-y-1">
         {items.map(f => {
           const on = active === f.name
@@ -170,11 +156,12 @@ function Facets({
                 aria-pressed={on}
                 className="flex w-full cursor-pointer items-center justify-between rounded-xl px-3 py-2 text-left text-[13px] transition-colors"
                 style={on
-                  ? { background: TEAL, color: INK, fontWeight: 600 }
-                  : { color: 'rgb(255 255 255 / 78%)' }}
+                  ? { background: TEAL, color: INK, fontWeight: 700 }
+                  : { color: INK }}
               >
                 <span className="truncate">{f.name}</span>
-                <span className="ml-2 shrink-0 text-[11px] tabular-nums" style={{ opacity: on ? 0.7 : 0.35 }}>
+                <span className="ml-2 shrink-0 text-[11px] tabular-nums"
+                      style={{ color: on ? INK : INK_FAINT, opacity: on ? 0.75 : 1 }}>
                   {f.count}
                 </span>
               </button>
