@@ -86,6 +86,114 @@ function dec(v: string | undefined): string {
   return Number.isFinite(n) ? n.toFixed(2) : '0.00'
 }
 
+/**
+ * Writes one order and its lines.
+ *
+ * Extracted so a webhook can sync a single order through exactly the same code
+ * as the full pull — a second writer is how the two quietly start disagreeing
+ * about a field.
+ *
+ * The lookup maps are optional: the bulk pull builds them once for 1133
+ * orders, while a single-order sync resolves the two ids it needs directly.
+ */
+export async function upsertOrderFromWoo(
+  o: WooOrder,
+  maps?: {
+    productByWooId: Map<number, string>
+    customerByWooId: Map<number, string>
+    customerByEmail: Map<string, string>
+  },
+): Promise<{ created: boolean; lines: number; linkedToProduct: number }> {
+  const b = o.billing ?? {}
+  const email = (b.email ?? '').trim().toLowerCase() || null
+
+  let customerId: string | null = null
+  if (maps) {
+    customerId =
+      (o.customer_id ? maps.customerByWooId.get(o.customer_id) : undefined)
+      ?? (email ? maps.customerByEmail.get(email) : undefined)
+      ?? null
+  } else {
+    const found = o.customer_id
+      ? await prisma.customer.findUnique({ where: { wooCustomerId: o.customer_id }, select: { id: true } })
+      : email
+        ? await prisma.customer.findFirst({ where: { EMAIL: email }, select: { id: true } })
+        : null
+    customerId = found?.id ?? null
+  }
+
+  const data = {
+    number: o.number ?? String(o.id),
+    status: o.status ?? 'pending',
+    currency: o.currency || 'EUR',
+    total: dec(o.total),
+    totalTax: dec(o.total_tax),
+    shippingTotal: dec(o.shipping_total),
+    discountTotal: dec(o.discount_total),
+    paymentMethod: o.payment_method || null,
+    paymentMethodTitle: text(o.payment_method_title),
+    transactionId: o.transaction_id || null,
+    wooCustomerId: o.customer_id || null,
+    customerId,
+    billingName:
+      text([b.first_name, b.last_name].filter(Boolean).join(' '))
+      ?? text(b.company) ?? email ?? 'Χωρίς όνομα',
+    email,
+    phone: b.phone || null,
+    city: text(b.city),
+    customerNote: text(o.customer_note),
+    datePaid: o.date_paid ? new Date(o.date_paid) : null,
+    dateCreated: o.date_created ? new Date(o.date_created) : new Date(),
+    dateModified: o.date_modified ? new Date(o.date_modified) : null,
+    wooSnapshot: o as object,
+    syncedAt: new Date(),
+  }
+
+  const existing = await prisma.order.findUnique({ where: { wooId: o.id }, select: { id: true } })
+  const order = await prisma.order.upsert({
+    where: { wooId: o.id },
+    update: data,
+    create: { wooId: o.id, ...data },
+  })
+
+  // Lines are replaced rather than merged: WooCommerce reissues line ids when
+  // an order is edited, so merging leaves orphans that inflate the total.
+  await prisma.orderLine.deleteMany({ where: { orderId: order.id } })
+
+  let lines = 0
+  let linkedToProduct = 0
+  for (const l of o.line_items ?? []) {
+    let productId: string | null = null
+    if (l.product_id) {
+      productId = maps
+        ? maps.productByWooId.get(l.product_id) ?? null
+        : (await prisma.productTranslation.findFirst({
+            where: { wooId: l.product_id }, select: { productId: true },
+          }))?.productId ?? null
+    }
+    if (productId) linkedToProduct++
+
+    await prisma.orderLine.create({
+      data: {
+        orderId: order.id,
+        wooLineId: l.id,
+        name: text(l.name) ?? 'Χωρίς όνομα',
+        sku: l.sku || null,
+        quantity: l.quantity ?? 1,
+        subtotal: dec(l.subtotal),
+        total: dec(l.total),
+        wooProductId: l.product_id || null,
+        wooVariationId: l.variation_id || null,
+        productId,
+        meta: readableMeta(l),
+      },
+    })
+    lines++
+  }
+
+  return { created: !existing, lines, linkedToProduct }
+}
+
 export async function pullOrders({ maxPages = 40 } = {}): Promise<OrderPullResult> {
   const { baseUrl, auth } = config()
 
@@ -133,76 +241,11 @@ export async function pullOrders({ maxPages = 40 } = {}): Promise<OrderPullResul
     result.fetched += orders.length
 
     for (const o of orders) {
-      const b = o.billing ?? {}
-      const email = (b.email ?? '').trim().toLowerCase() || null
-
-      const customerId =
-        (o.customer_id ? customerByWooId.get(o.customer_id) : undefined)
-        ?? (email ? customerByEmail.get(email) : undefined)
-        ?? null
-      if (customerId) result.linkedToCustomer++
-
-      const data = {
-        number: o.number ?? String(o.id),
-        status: o.status ?? 'pending',
-        currency: o.currency || 'EUR',
-        total: dec(o.total),
-        totalTax: dec(o.total_tax),
-        shippingTotal: dec(o.shipping_total),
-        discountTotal: dec(o.discount_total),
-        paymentMethod: o.payment_method || null,
-        paymentMethodTitle: text(o.payment_method_title),
-        transactionId: o.transaction_id || null,
-        // 0 upstream means guest; null reads correctly in the admin.
-        wooCustomerId: o.customer_id || null,
-        customerId,
-        billingName:
-          text([b.first_name, b.last_name].filter(Boolean).join(' '))
-          ?? text(b.company) ?? email ?? 'Χωρίς όνομα',
-        email,
-        phone: b.phone || null,
-        city: text(b.city),
-        customerNote: text(o.customer_note),
-        datePaid: o.date_paid ? new Date(o.date_paid) : null,
-        dateCreated: o.date_created ? new Date(o.date_created) : new Date(),
-        dateModified: o.date_modified ? new Date(o.date_modified) : null,
-        wooSnapshot: o as object,
-        syncedAt: new Date(),
-      }
-
-      const existing = await prisma.order.findUnique({ where: { wooId: o.id }, select: { id: true } })
-      const order = await prisma.order.upsert({
-        where: { wooId: o.id },
-        update: data,
-        create: { wooId: o.id, ...data },
-      })
-      existing ? result.updated++ : result.created++
-
-      // Lines are replaced rather than merged: WooCommerce reissues line ids
-      // when an order is edited, so a merge leaves orphans that inflate the
-      // order total on screen.
-      await prisma.orderLine.deleteMany({ where: { orderId: order.id } })
-
-      for (const l of o.line_items ?? []) {
-        const productId = l.product_id ? productByWooId.get(l.product_id) ?? null : null
-        if (productId) result.linkedToProduct++
-        await prisma.orderLine.create({
-          data: {
-            orderId: order.id,
-            wooLineId: l.id,
-            name: text(l.name) ?? 'Χωρίς όνομα',
-            sku: l.sku || null,
-            quantity: l.quantity ?? 1,
-            subtotal: dec(l.subtotal),
-            total: dec(l.total),
-            wooProductId: l.product_id || null,
-            wooVariationId: l.variation_id || null,
-            productId,
-            meta: readableMeta(l),
-          },
-        })
-        result.linesWritten++
-      }
+      const r = await upsertOrderFromWoo(o, { productByWooId, customerByWooId, customerByEmail })
+      r.created ? result.created++ : result.updated++
+      result.linesWritten += r.lines
+      result.linkedToProduct += r.linkedToProduct
+      if (o.customer_id || o.billing?.email) result.linkedToCustomer++
     }
 
     if (page >= Number(res.headers.get('x-wp-totalpages') ?? '1')) break

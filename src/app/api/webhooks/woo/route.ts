@@ -1,14 +1,20 @@
+import { after } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { extractWooId, isPing, verifyWebhook } from '@/lib/woo/webhook'
+import { scheduleWebhookDrain } from '@/lib/woo/webhook-scheduler'
 
 /**
  * WooCommerce webhook receiver.
  *
- * Verifies, persists, returns 200. Nothing else happens here — no pull, no
- * image mirroring, no database walk. WooCommerce times a delivery out and
- * retries what it considers failed, so a receiver that does real work turns one
- * product edit into a retry storm, and a crash halfway through loses the event
- * because the 200 was already sent. Draining the inbox is the worker's job.
+ * Verifies, persists, returns 200 — then syncs AFTER the response has gone
+ * out, via `after()`. WooCommerce times a delivery out and retries what it
+ * considers failed, so doing a catalogue pull before responding turns one
+ * product edit into a retry storm. Doing it after costs WooCommerce nothing
+ * and means no cron is needed: the endpoint is live, and so is the work it
+ * triggers.
+ *
+ * The scheduler behind it is single-flight and debounced, so a burst of edits
+ * collapses into one pull instead of one per delivery.
  *
  * Status codes are deliberate:
  *   200  accepted, or a replay, or a ping — anything WooCommerce should stop retrying
@@ -77,6 +83,12 @@ export async function POST(request: Request) {
     return new Response('storage error', { status: 500 })
   }
 
+  // Runs once the response is flushed. WooCommerce sees a fast 200 and is
+  // finished with us; the sync happens on our own time.
+  after(async () => {
+    await scheduleWebhookDrain()
+  })
+
   return new Response('ok', { status: 200 })
 }
 
@@ -86,5 +98,6 @@ export async function GET() {
     endpoint: 'woo',
     configured: !!process.env.WOO_WEBHOOK_SECRET,
     method: 'POST only',
+    processing: 'automatic — the sync runs after each delivery is stored',
   })
 }

@@ -23,7 +23,7 @@ export async function processWebhooks(): Promise<WebhookActionResult> {
       ok: true,
       message:
         `${r.claimed} events: ${r.done} ολοκληρώθηκαν, ${r.ignored} αγνοήθηκαν, ${r.failed} απέτυχαν.` +
-        (r.ran.length ? ` Έτρεξαν: ${[...new Set(r.ran)].join(', ')}.` : ''),
+        (r.details.length ? ` ${r.details.slice(0, 3).join(' · ')}` : ''),
     }
   } catch (err) {
     return { ok: false, error: err instanceof Error ? err.message : String(err) }

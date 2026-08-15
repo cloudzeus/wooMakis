@@ -127,7 +127,18 @@ export type ProductPullResult = {
 
 export async function pullProducts(): Promise<ProductPullResult> {
   const posts = await listProducts()
-  const upserts = toProductUpserts(posts)
+  return persistProductUpserts(toProductUpserts(posts))
+}
+
+/**
+ * Writes a set of product upserts and returns what changed.
+ *
+ * Extracted from pullProducts so the webhook path can persist ONE product
+ * through exactly the same code. A second, near-identical writer is how the
+ * full sync and the event-driven sync end up disagreeing about a field months
+ * later, with nobody able to say which is right.
+ */
+export async function persistProductUpserts(upserts: ProductUpsert[]): Promise<ProductPullResult> {
   let created = 0
   let updated = 0
   const imageUrls: string[] = []

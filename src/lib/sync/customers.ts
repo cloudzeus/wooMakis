@@ -49,6 +49,39 @@ function fullName(first?: string, last?: string, company?: string, email?: strin
 
 export type CustomerPullResult = { registered: number; guests: number; updated: number }
 
+/**
+ * Writes one registered WooCommerce customer.
+ *
+ * Extracted so a webhook can sync a single customer through the same code as
+ * the bulk pull, rather than a second writer that drifts.
+ */
+export async function upsertCustomerFromWoo(c: WooCustomer): Promise<{ created: boolean }> {
+  const b = c.billing ?? {}
+  const data = {
+    source: 'WOO' as const,
+    NAME: fullName(c.first_name, c.last_name, b.company, c.email),
+    firstName: c.first_name || null,
+    lastName: c.last_name || null,
+    company: b.company || null,
+    EMAIL: (c.email || b.email || '').toLowerCase() || null,
+    PHONE01: b.phone || null,
+    ADDRESS: [b.address_1, b.address_2].filter(Boolean).join(', ') || null,
+    CITY: b.city || null,
+    ZIP: b.postcode || null,
+    DISTRICT: b.state || null,
+    COUNTRY: b.country || null,
+    wooSnapshot: c as object,
+  }
+
+  const existing = await prisma.customer.findUnique({ where: { wooCustomerId: c.id } })
+  await prisma.customer.upsert({
+    where: { wooCustomerId: c.id },
+    update: data,
+    create: { wooCustomerId: c.id, ...data },
+  })
+  return { created: !existing }
+}
+
 export async function pullCustomers(): Promise<CustomerPullResult> {
   const [customers, orders] = await Promise.all([
     listAll<WooCustomer>('customers', CUSTOMER_FIELDS),
@@ -59,43 +92,8 @@ export async function pullCustomers(): Promise<CustomerPullResult> {
   let updated = 0
 
   for (const c of customers) {
-    const b = c.billing ?? {}
-    const existing = await prisma.customer.findUnique({ where: { wooCustomerId: c.id } })
-    await prisma.customer.upsert({
-      where: { wooCustomerId: c.id },
-      update: {
-        source: 'WOO',
-        NAME: fullName(c.first_name, c.last_name, b.company, c.email),
-        firstName: c.first_name || null,
-        lastName: c.last_name || null,
-        company: b.company || null,
-        EMAIL: (c.email || b.email || '').toLowerCase() || null,
-        PHONE01: b.phone || null,
-        ADDRESS: [b.address_1, b.address_2].filter(Boolean).join(', ') || null,
-        CITY: b.city || null,
-        ZIP: b.postcode || null,
-        DISTRICT: b.state || null,
-        COUNTRY: b.country || null,
-        wooSnapshot: c as object,
-      },
-      create: {
-        wooCustomerId: c.id,
-        source: 'WOO',
-        NAME: fullName(c.first_name, c.last_name, b.company, c.email),
-        firstName: c.first_name || null,
-        lastName: c.last_name || null,
-        company: b.company || null,
-        EMAIL: (c.email || b.email || '').toLowerCase() || null,
-        PHONE01: b.phone || null,
-        ADDRESS: [b.address_1, b.address_2].filter(Boolean).join(', ') || null,
-        CITY: b.city || null,
-        ZIP: b.postcode || null,
-        DISTRICT: b.state || null,
-        COUNTRY: b.country || null,
-        wooSnapshot: c as object,
-      },
-    })
-    existing ? updated++ : registered++
+    const r = await upsertCustomerFromWoo(c)
+    r.created ? registered++ : updated++
   }
 
   // Guest orders, deduped by lowercased email. Totals are accumulated across

@@ -1,21 +1,23 @@
 import { prisma } from '@/lib/prisma'
-import { pullOrders, recomputeCustomerTotals } from '@/lib/sync/orders'
-import { pullCustomers } from '@/lib/sync/customers'
-import { runFullPull } from '@/lib/sync/run'
+import {
+  markProductDeleted, syncCustomer, syncOrder, syncProduct, type TargetedResult,
+} from '@/lib/sync/targeted'
 
 /**
- * Drains the webhook inbox.
+ * Drains the webhook inbox, one object at a time.
  *
- * Deliberately coarse. WooCommerce tells us *that* a product changed; it does
- * not tell us anything the existing pull cannot fetch more reliably, and the
- * payload it sends is a snapshot that may already be stale by the time we act
- * on it. So an event marks what needs refreshing and the normal sync does the
- * refreshing — one code path for both manual and event-driven updates, rather
- * than a second, subtly different importer that only runs on webhooks.
+ * The first version answered every event with a FULL catalogue pull. That was
+ * wrong three ways: minutes of work for a one-field edit, needless load on
+ * mylens.gr, and — the fatal one — far too long to finish in the window the
+ * runtime keeps a request alive after responding, so it was killed mid-run and
+ * nothing was ever marked done.
  *
- * Events are also COALESCED: fifty product updates in a minute become one
- * catalogue pull, not fifty. That is the whole reason for batching by topic
- * rather than processing row by row.
+ * A webhook already names the object that changed. Fetching just that object
+ * takes a few hundred milliseconds, which comfortably fits, and it reuses the
+ * same writers as the full sync so the two cannot disagree.
+ *
+ * Events for the same object are collapsed: five saves of one product become
+ * one fetch, because only the latest state matters.
  */
 
 export type DrainResult = {
@@ -23,80 +25,106 @@ export type DrainResult = {
   done: number
   failed: number
   ignored: number
-  ran: string[]
+  details: string[]
 }
 
-/** Topics we act on, mapped to the sync each one triggers. */
-type Job = 'catalog' | 'orders' | 'customers'
+/** Deletion events must not re-fetch — the object is gone. */
+function isDeletion(topic: string): boolean {
+  return topic.endsWith('.deleted') || topic.endsWith('.trashed')
+}
 
-function jobFor(topic: string): Job | null {
+async function handle(topic: string, wooId: number): Promise<TargetedResult> {
   const resource = topic.split('.')[0]
-  if (resource === 'product') return 'catalog'
-  if (resource === 'order') return 'orders'
-  if (resource === 'customer') return 'customers'
-  return null
+
+  if (resource === 'product') {
+    return isDeletion(topic) ? markProductDeleted(wooId) : syncProduct(wooId)
+  }
+  if (resource === 'order') {
+    // A deleted order is left in place: it is a financial record, and the
+    // admin screen is a mirror of history rather than of current state.
+    return isDeletion(topic)
+      ? { synced: false, detail: `order ${wooId} deleted upstream; local copy kept` }
+      : syncOrder(wooId)
+  }
+  if (resource === 'customer') {
+    return isDeletion(topic)
+      ? { synced: false, detail: `customer ${wooId} deleted upstream; local copy kept` }
+      : syncCustomer(wooId)
+  }
+
+  return { synced: false, detail: `no handler for ${topic}` }
 }
 
-/**
- * @param max how many events to claim in one pass. A cap keeps a backlog from
- *        turning into one enormous transaction after an outage.
- */
-export async function drainWebhookInbox({ max = 200 } = {}): Promise<DrainResult> {
+/** How many attempts before an event is parked as FAILED. */
+const MAX_ATTEMPTS = 4
+
+export async function drainWebhookInbox({ max = 100 } = {}): Promise<DrainResult> {
   const pending = await prisma.webhookEvent.findMany({
     where: { status: 'PENDING' },
     orderBy: { receivedAt: 'asc' },
     take: max,
   })
 
-  const result: DrainResult = { claimed: pending.length, done: 0, failed: 0, ignored: 0, ran: [] }
+  const result: DrainResult = { claimed: pending.length, done: 0, failed: 0, ignored: 0, details: [] }
   if (pending.length === 0) return result
 
-  const actionable = new Map<Job, string[]>()
-  const ignored: string[] = []
+  // Collapse by object: five saves of one product need one fetch. The newest
+  // event wins, and the older ones are closed out alongside it.
+  const groups = new Map<string, typeof pending>()
+  const unhandled: string[] = []
 
   for (const e of pending) {
-    const job = jobFor(e.topic)
-    if (!job) { ignored.push(e.id); continue }
-    actionable.set(job, [...(actionable.get(job) ?? []), e.id])
+    const resource = e.topic.split('.')[0]
+    if (!['product', 'order', 'customer'].includes(resource) || !e.wooId) {
+      unhandled.push(e.id)
+      continue
+    }
+    const key = `${resource}:${e.wooId}:${isDeletion(e.topic) ? 'del' : 'upd'}`
+    groups.set(key, [...(groups.get(key) ?? []), e])
   }
 
-  if (ignored.length) {
+  if (unhandled.length) {
     await prisma.webhookEvent.updateMany({
-      where: { id: { in: ignored } },
+      where: { id: { in: unhandled } },
       data: { status: 'IGNORED', processedAt: new Date() },
     })
-    result.ignored = ignored.length
+    result.ignored = unhandled.length
   }
 
-  for (const [job, ids] of actionable) {
-    try {
-      // Images are skipped on a webhook-driven catalogue pull: mirroring to
-      // Bunny is minutes of work and would hold the worker open while more
-      // events pile up behind it. The scheduled full sync picks them up.
-      if (job === 'catalog') await runFullPull({ withImages: false })
-      if (job === 'orders') { await pullOrders(); await recomputeCustomerTotals() }
-      if (job === 'customers') await pullCustomers()
+  for (const events of groups.values()) {
+    const latest = events[events.length - 1]
+    const ids = events.map(e => e.id)
 
+    try {
+      const outcome = await handle(latest.topic, latest.wooId!)
       await prisma.webhookEvent.updateMany({
         where: { id: { in: ids } },
-        data: { status: 'DONE', processedAt: new Date(), attempts: { increment: 1 } },
+        data: {
+          // "Not found upstream" is a real answer, not a failure to retry.
+          status: 'DONE',
+          processedAt: new Date(),
+          attempts: { increment: 1 },
+          error: outcome.synced ? null : outcome.detail,
+        },
       })
       result.done += ids.length
-      result.ran.push(job)
+      result.details.push(outcome.detail)
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err)
-      // Left PENDING so the next pass retries, unless it has failed enough
-      // times to look permanent — a poisoned event must not block the queue
-      // behind it for ever.
+
+      // Left PENDING so the next delivery retries it, until it has failed
+      // enough times to look permanent — one poisoned event must not block
+      // the queue behind it for ever.
       await prisma.webhookEvent.updateMany({
-        where: { id: { in: ids }, attempts: { lt: 4 } },
+        where: { id: { in: ids }, attempts: { lt: MAX_ATTEMPTS - 1 } },
         data: { error: message.slice(0, 1000), attempts: { increment: 1 } },
       })
       await prisma.webhookEvent.updateMany({
-        where: { id: { in: ids }, attempts: { gte: 4 } },
+        where: { id: { in: ids }, attempts: { gte: MAX_ATTEMPTS - 1 } },
         data: { status: 'FAILED', error: message.slice(0, 1000), processedAt: new Date() },
       })
       result.failed += ids.length
+      result.details.push(`${latest.topic} #${latest.wooId}: ${message.slice(0, 120)}`)
     }
   }
 
