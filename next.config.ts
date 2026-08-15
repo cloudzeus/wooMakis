@@ -1,6 +1,9 @@
 import type { NextConfig } from 'next'
 
 const nextConfig: NextConfig = {
+  // Required by the Dockerfile's runtime stage, which copies .next/standalone.
+  output: 'standalone',
+
   // `next dev` otherwise regenerates AGENTS.md and CLAUDE.md at the repo root
   // on every start. They were deliberately removed in 2a987ae.
   agentRules: false,
