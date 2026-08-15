@@ -36,6 +36,7 @@ export const NAV_GROUPS: NavGroup[] = [
     items: [
       { href: '/products',   label: 'Προϊόντα',     permission: 'product.view' },
       { href: '/categories', label: 'Κατηγορίες',   permission: 'category.view' },
+      { href: '/brands',     label: 'Μάρκες',       permission: 'brand.view' },
       { href: '/customers',  label: 'Πελάτες',      permission: 'customer.view' },
       { href: '/sync',       label: 'Συγχρονισμός', permission: 'sync.view' },
     ],

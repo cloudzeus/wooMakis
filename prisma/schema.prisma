@@ -385,3 +385,60 @@ model ProductBrand {
   @@id([productId, brandId])
   @@index([brandId])
 }
+
+// ── Customers ────────────────────────────────────────────
+// Shaped after the damask Trdr model as agreed, keeping the SoftOne-style field
+// names even though no SoftOne connector exists here: the user runs that stack
+// elsewhere and wanted the naming to carry over.
+
+enum CustomerSource {
+  /// A registered WooCommerce customer account.
+  WOO
+  /// Derived from the billing block of a guest order.
+  GUEST
+  /// Created here, never seen upstream.
+  LOCAL
+}
+
+model Customer {
+  id     String @id @default(cuid())
+  /// Null for guests and local records; unique when present.
+  wooCustomerId Int? @unique
+  source CustomerSource @default(WOO)
+
+  /// 13 = πελάτης, 12 = προμηθευτής (SoftOne SODTYPE convention).
+  SODTYPE Int     @default(13)
+  CODE    String?
+  NAME    String
+  AFM     String?
+  IRSDATA String?
+  JOBTYPETRD String?
+  ADDRESS String?
+  ZIP     String?
+  DISTRICT String?
+  CITY    String?
+  /// ISO-2 as WooCommerce sends it, e.g. "GR".
+  COUNTRY String?
+  PHONE01 String?
+  EMAIL   String?
+  WEBPAGE String?
+  ISACTIVE Int    @default(1)
+  REMARKS String?
+
+  firstName String?
+  lastName  String?
+  company   String?
+
+  /// Aggregated from orders, so the list can be sorted by value.
+  orderCount Int      @default(0)
+  totalSpent Decimal  @default(0) @db.Decimal(12, 2)
+  lastOrderAt DateTime?
+
+  wooSnapshot Json?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([source])
+  @@index([EMAIL])
+  @@index([NAME])
+}

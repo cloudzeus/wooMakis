@@ -4,6 +4,7 @@ import { prisma } from '@/lib/prisma'
 import { requirePermission } from '@/lib/rbac-server'
 import { can } from '@/lib/rbac'
 import { readGate } from '@/lib/woo/write'
+import { normalizeAttributes } from '@/lib/woo/attributes'
 import { isDeepSeekConfigured } from '@/lib/deepseek'
 import { ProductEditor } from './product-editor'
 
@@ -61,6 +62,7 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
             shortDescription: t.shortDescription ?? '',
             permalink: t.permalink,
           })),
+          attributes: normalizeAttributes(product.attributes),
           images: product.images.map(pi => ({
             assetId: pi.asset.id,
             cdnUrl: pi.asset.cdnUrl,

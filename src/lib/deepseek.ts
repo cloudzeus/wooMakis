@@ -119,3 +119,50 @@ export async function translateProductFields(
   if (!parsed.name) throw new DeepSeekError('Η μετάφραση δεν περιείχε όνομα προϊόντος.')
   return parsed
 }
+
+export type TranslatableTerm = { name: string; description?: string | null }
+
+/**
+ * Translates a taxonomy term — a category or a brand.
+ *
+ * Separate from the product prompt because the constraints differ: a brand name
+ * is a proper noun that must survive untouched (Optimax stays Optimax in every
+ * language), and a category name is a short label where an over-long
+ * translation breaks the navigation layout.
+ */
+export async function translateTermFields(
+  term: TranslatableTerm,
+  fromLocale: string,
+  toLocale: string,
+  kind: 'category' | 'brand',
+): Promise<TranslatableTerm> {
+  const from = LANGUAGE_NAMES[fromLocale] ?? fromLocale
+  const to = LANGUAGE_NAMES[toLocale] ?? toLocale
+
+  const system = [
+    `You translate ${kind} names for an optical retailer from ${from} to ${to}.`,
+    'Rules:',
+    kind === 'brand'
+      ? '- A brand name is a proper noun: return it UNCHANGED unless it is a descriptive Greek phrase.'
+      : '- Category names are short navigation labels: keep the translation as short as the source.',
+    '- Keep measurements, model codes, and numbers exactly as they are.',
+    '- Preserve any HTML tags in the description exactly.',
+    '- Return ONLY a JSON object with keys: name, description.',
+    '- If the source description is empty, return an empty string.',
+  ].join('\n')
+
+  const raw = await deepseekChat([
+    { role: 'system', content: system },
+    { role: 'user', content: JSON.stringify({ name: term.name, description: term.description ?? '' }) },
+  ])
+
+  const cleaned = raw.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '')
+  let parsed: TranslatableTerm
+  try {
+    parsed = JSON.parse(cleaned) as TranslatableTerm
+  } catch {
+    throw new DeepSeekError(`Η απάντηση δεν ήταν έγκυρο JSON: ${cleaned.slice(0, 200)}`)
+  }
+  if (!parsed.name) throw new DeepSeekError('Η μετάφραση δεν περιείχε όνομα.')
+  return parsed
+}

@@ -1,5 +1,6 @@
 'use client'
 
+import Link from 'next/link'
 import { useMemo } from 'react'
 import type { ColumnDef } from '@tanstack/react-table'
 import { DataTable } from '@/components/data-table'
@@ -25,7 +26,11 @@ export function CategoriesTable({ rows }: { rows: CategoryRow[] }) {
       id: 'name',
       header: 'Όνομα (el)',
       accessorFn: r => r.nameEl ?? '',
-      cell: ({ row }) => <span className="font-medium">{row.original.nameEl ?? '—'}</span>,
+      cell: ({ row }) => (
+        <Link href={`/categories/${row.original.id}`} className="font-medium hover:underline">
+          {row.original.nameEl ?? '—'}
+        </Link>
+      ),
     },
     { id: 'nameEn', header: 'Όνομα (en)', accessorFn: r => r.nameEn ?? '', cell: ({ getValue }) => (getValue() as string) || <span className="text-muted-foreground">—</span> },
     { id: 'slug', header: 'Slug', accessorFn: r => r.slugEl ?? '' },

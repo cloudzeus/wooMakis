@@ -33,6 +33,21 @@ export const VARIATION_FIELDS = [
   'stock_quantity', 'stock_status', 'attributes', 'image', 'menu_order',
 ] as const
 
+export const CUSTOMER_FIELDS = [
+  'id', 'email', 'first_name', 'last_name', 'username', 'role',
+  'billing', 'shipping', 'is_paying_customer', 'date_created', 'date_modified',
+] as const
+
+/**
+ * Order fields for customer ingestion. Deliberately narrow: line items are not
+ * needed to build a customer list, and pulling them across 1133 orders would be
+ * a much heavier request.
+ */
+export const ORDER_FIELDS = [
+  'id', 'number', 'status', 'currency', 'total', 'customer_id',
+  'billing', 'date_created', 'date_modified',
+] as const
+
 /** Comma-joined for the `_fields` query parameter. */
 export function fieldParam(list: readonly string[]): string {
   return list.join(',')

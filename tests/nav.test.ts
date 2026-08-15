@@ -36,7 +36,7 @@ describe('nav permission filtering', () => {
 
   it('gives VIEWER only read-only screens', () => {
     expect(visibleTo('VIEWER').sort()).toEqual(
-      ['/categories', '/customers', '/dashboard', '/media', '/products', '/sync'].sort(),
+      ['/brands', '/categories', '/customers', '/dashboard', '/media', '/products', '/sync'].sort(),
     )
   })
 

@@ -18,7 +18,7 @@ import type { StoreProduct } from './types'
  * what makes a different power per eye possible.
  */
 export function EyePicker({ product }: { product: StoreProduct }) {
-  const { perEye, choices, fixed } = useMemo(
+  const { perEye, choices, clinical, fixed } = useMemo(
     () => splitAttributes(product.attributes),
     [product.attributes],
   )
@@ -55,6 +55,12 @@ export function EyePicker({ product }: { product: StoreProduct }) {
     }
     for (const a of choices) {
       selections[attrLabel(a.name)] = picked[a.name]
+    }
+    // Base curve and diameter identify the lens even when the product offers
+    // only one of each. An order without them cannot be dispensed, so they go
+    // on the line whether or not the customer had anything to pick.
+    for (const a of clinical) {
+      selections[attrLabel(a.name)] = a.options[0]
     }
 
     start(async () => {
@@ -125,6 +131,26 @@ export function EyePicker({ product }: { product: StoreProduct }) {
           </select>
         </label>
       ))}
+
+      {clinical.length > 0 && (
+        <div className="rounded-2xl p-4" style={{ background: SURFACE, border: `1px solid ${TEAL}` }}>
+          <p className="mb-2 text-[11px] font-bold uppercase tracking-[0.13em]" style={{ color: TEAL_DEEP }}>
+            Καταχωρείται στην παραγγελία
+          </p>
+          <dl className="flex flex-wrap gap-x-6 gap-y-2">
+            {clinical.map(a => (
+              <div key={a.name} className="flex items-baseline gap-2">
+                <dt className="text-[11px] uppercase tracking-[0.1em]" style={{ color: INK_MUTED }}>
+                  {attrLabel(a.name)}
+                </dt>
+                <dd className="text-[13px] font-semibold tabular-nums" style={{ color: INK }}>
+                  {a.options[0]}
+                </dd>
+              </div>
+            ))}
+          </dl>
+        </div>
+      )}
 
       {fixed.length > 0 && (
         <dl className="flex flex-wrap gap-x-6 gap-y-2 rounded-2xl p-4" style={{ background: CREAM }}>

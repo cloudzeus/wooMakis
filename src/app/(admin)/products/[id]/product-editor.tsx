@@ -1,10 +1,16 @@
 'use client'
 
-import Image from 'next/image'
 import { useRef, useState, useTransition } from 'react'
+import type { WooAttribute } from '@/lib/woo/attributes'
 import {
-  previewImagePush, pushImagesToWoo, removeProductImage,
-  saveProductFields, translateProduct, uploadProductImage, type PushPreview,
+  VerdictTable, WooPushPanel, type Gate, type Report,
+} from '@/components/admin/woo-push'
+import { AttributeEditor } from './attribute-editor'
+import { ImageSorter } from './image-sorter'
+import {
+  previewProductPush, pushProductToWoo, removeProductImage, reorderProductImages,
+  saveProductAttributes, saveProductFields, translateProduct, uploadProductImage,
+  verifyAgainstWoo, type PushPreview, type PushScope,
 } from './actions'
 
 type Img = {
@@ -16,21 +22,32 @@ type Product = {
   id: string; wooGroupKey: number; sku: string; type: string; status: string
   price: string; regularPrice: string; onSale: boolean
   stockStatus: string; stockQuantity: number | null
-  categories: string[]; translations: Tr[]; images: Img[]
+  categories: string[]; translations: Tr[]; images: Img[]; attributes: WooAttribute[]
 }
+
+const PUSH_OPTIONS = [
+  { key: 'content' as const, label: 'Ονόματα και περιγραφές',
+    hint: 'Ξεχωριστά ανά γλώσσα — κάθε μετάφραση είναι δικό της post στο WordPress.' },
+  { key: 'pricing' as const, label: 'SKU, τιμή, κατάσταση, απόθεμα',
+    hint: 'Η τιμή πώλησης δεν στέλνεται: το Woo την υπολογίζει από την κανονική τιμή.' },
+  { key: 'attributes' as const, label: 'Χαρακτηριστικά',
+    hint: 'Το WooCommerce ΑΝΤΙΚΑΘΙΣΤΑ όλο το σύνολο — στέλνονται πάντα όλα.' },
+  { key: 'images' as const, label: 'Εικόνες',
+    hint: 'Το WordPress τις κατεβάζει από το Bunny. Αντικαθιστά όλη τη συλλογή.' },
+]
 
 export function ProductEditor({
   product, canEdit, canUpload, canDelete, canPush, gate, deepseekReady,
 }: {
   product: Product
   canEdit: boolean; canUpload: boolean; canDelete: boolean; canPush: boolean
-  gate: { allowWrites: boolean; dryRun: boolean; environment: string }
+  gate: Gate
   deepseekReady: boolean
 }) {
   const [pending, start] = useTransition()
   const [toast, setToast] = useState<{ ok: boolean; text: string } | null>(null)
   const [preview, setPreview] = useState<PushPreview | null>(null)
-  const [confirmText, setConfirmText] = useState('')
+  const [reports, setReports] = useState<Report[]>([])
   const fileRef = useRef<HTMLInputElement>(null)
 
   const [form, setForm] = useState({
@@ -43,15 +60,10 @@ export function ProductEditor({
       locale: t.locale, name: t.name, shortDescription: t.shortDescription,
     })),
   })
+  const [attributes, setAttributes] = useState<WooAttribute[]>(product.attributes)
 
-  const writesBlocked = !gate.allowWrites || gate.dryRun
-  const requiredPhrase = 'confirm production push'
-
-  function onSave() {
-    start(async () => {
-      const r = await saveProductFields(product.id, form)
-      setToast(r.ok ? { ok: true, text: r.message } : { ok: false, text: r.error })
-    })
+  function report(r: { ok: boolean; message?: string; error?: string }) {
+    setToast(r.ok ? { ok: true, text: r.message! } : { ok: false, text: r.error! })
   }
 
   function onUpload(e: React.ChangeEvent<HTMLInputElement>) {
@@ -60,8 +72,7 @@ export function ProductEditor({
     const fd = new FormData()
     fd.set('file', file)
     start(async () => {
-      const r = await uploadProductImage(product.id, fd)
-      setToast(r.ok ? { ok: true, text: r.message } : { ok: false, text: r.error })
+      report(await uploadProductImage(product.id, fd))
       if (fileRef.current) fileRef.current.value = ''
     })
   }
@@ -79,7 +90,7 @@ export function ProductEditor({
         </div>
         {canEdit && (
           <button
-            onClick={onSave}
+            onClick={() => start(async () => report(await saveProductFields(product.id, form)))}
             disabled={pending}
             className="h-10 cursor-pointer rounded-full bg-primary px-5 text-sm font-medium text-primary-foreground disabled:opacity-60"
           >
@@ -113,44 +124,17 @@ export function ProductEditor({
           )}
         </div>
 
-        {product.images.length === 0 ? (
-          <p className="py-6 text-center text-sm text-muted-foreground">
-            Το προϊόν δεν έχει εικόνες. Πρόσθεσε μία — θα μετατραπεί αυτόματα σε WebP.
-          </p>
-        ) : (
-          <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
-            {product.images.map(img => (
-              <li key={img.assetId} className="group relative">
-                <Image
-                  src={img.cdnUrl}
-                  alt={img.alt ?? ''}
-                  width={img.width ?? 300}
-                  height={img.height ?? 300}
-                  className="aspect-square w-full rounded-[10px] border border-border object-cover"
-                  unoptimized
-                />
-                <div className="mt-1 text-[11px] text-muted-foreground">
-                  {img.mimeType.replace('image/', '').toUpperCase()} · {Math.round(img.bytes / 1024)} KB
-                  {img.width && img.height && <> · {img.width}×{img.height}</>}
-                </div>
-                {canDelete && (
-                  <button
-                    onClick={() =>
-                      start(async () => {
-                        const r = await removeProductImage(product.id, img.assetId)
-                        setToast(r.ok ? { ok: true, text: r.message } : { ok: false, text: r.error })
-                      })
-                    }
-                    className="absolute right-1 top-1 cursor-pointer rounded-full bg-card/90 px-2 py-0.5 text-xs opacity-0 shadow group-hover:opacity-100"
-                    aria-label="Αφαίρεση εικόνας"
-                  >
-                    ✕
-                  </button>
-                )}
-              </li>
-            ))}
-          </ul>
-        )}
+        <ImageSorter
+          // Remount when the set changes so the sorter picks up added or
+          // removed images instead of holding its initial copy.
+          key={product.images.map(i => i.assetId).join(',')}
+          images={product.images}
+          disabled={!canEdit || pending}
+          onReorder={ids => start(async () => report(await reorderProductImages(product.id, ids)))}
+          onRemove={canDelete
+            ? assetId => start(async () => report(await removeProductImage(product.id, assetId)))
+            : undefined}
+        />
       </section>
 
       {/* ── Fields ───────────────────────────────── */}
@@ -183,16 +167,11 @@ export function ProductEditor({
                   return (
                     <button
                       key={loc}
-                      onClick={() =>
-                        start(async () => {
-                          const r = await translateProduct(product.id, loc)
-                          setToast(r.ok ? { ok: true, text: r.message } : { ok: false, text: r.error })
-                        })
-                      }
+                      onClick={() => start(async () => report(await translateProduct(product.id, loc)))}
                       disabled={pending || !deepseekReady}
                       title={
                         deepseekReady
-                          ? `${exists ? 'Επαναμετάφραση' : 'Δημιουργία μετάφρασης'} στα ${loc}`
+                          ? `${exists ? 'Επαναμετάφραση' : 'Δημιουργία μετάφρασης'} στα ${loc} με DeepSeek`
                           : 'Λείπει το DEEPSEEK_API_KEY'
                       }
                       className="cursor-pointer rounded-full border border-border px-3 py-1.5 text-xs hover:bg-accent disabled:opacity-40"
@@ -218,7 +197,9 @@ export function ProductEditor({
                     <span className="rounded-full bg-[var(--navy)]/10 px-2 py-0.5 text-[11px] uppercase text-[var(--navy)]">
                       {t.locale}
                     </span>
-                    <span className="text-xs text-muted-foreground">{meta?.wooId ? `Woo #${meta.wooId}` : 'τοπική — δεν υπάρχει στο Woo'}</span>
+                    <span className="text-xs text-muted-foreground">
+                      {meta?.wooId ? `Woo #${meta.wooId}` : 'τοπική — δεν υπάρχει στο Woo'}
+                    </span>
                   </div>
                   <Field label="Όνομα" value={t.name} disabled={!canEdit}
                     onChange={v => {
@@ -242,79 +223,70 @@ export function ProductEditor({
         </div>
       </section>
 
-      {/* ── Push to WooCommerce ──────────────────── */}
-      {canPush && (
-        <section className="rounded-2xl border border-border bg-card p-5">
-          <h2 className="mb-1 font-display text-base font-semibold">Αποστολή εικόνων στο WooCommerce</h2>
-          <p className="mb-3 text-sm text-muted-foreground">
-            Το WordPress κατεβάζει τις εικόνες από το Bunny CDN (sideload). Το WooCommerce
-            <strong> αντικαθιστά ολόκληρη τη συλλογή</strong>, γι&apos; αυτό στέλνονται πάντα όλες.
-          </p>
-
-          <div className="mb-3 flex flex-wrap gap-2 text-xs">
-            <Gate ok={gate.allowWrites} label={`WOO_ALLOW_WRITES=${gate.allowWrites}`} />
-            <Gate ok={!gate.dryRun} label={`WOO_DRY_RUN=${gate.dryRun}`} />
-            <Gate ok={gate.environment !== 'production'} label={`env=${gate.environment}`} warn />
-          </div>
-
-          <div className="flex flex-wrap items-center gap-2">
+      {/* ── Attributes ───────────────────────────── */}
+      <section className="rounded-2xl border border-border bg-card p-5">
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+          <h2 className="font-display text-base font-semibold">
+            Χαρακτηριστικά <span className="text-muted-foreground">({attributes.length})</span>
+          </h2>
+          {canEdit && (
             <button
-              onClick={() => start(async () => setPreview(await previewImagePush(product.id)))}
+              onClick={() => start(async () => report(await saveProductAttributes(product.id, attributes)))}
               disabled={pending}
-              className="h-9 cursor-pointer rounded-full border border-border px-4 text-sm hover:bg-accent"
+              className="cursor-pointer rounded-full border border-border px-4 py-2 text-sm hover:bg-accent disabled:opacity-50"
             >
-              Προεπισκόπηση payload
+              Αποθήκευση χαρακτηριστικών
             </button>
-
-            {!writesBlocked && (
-              <>
-                <input
-                  value={confirmText}
-                  onChange={e => setConfirmText(e.target.value)}
-                  placeholder={requiredPhrase}
-                  aria-label="Φράση επιβεβαίωσης"
-                  className="h-9 w-64 rounded-full border border-border bg-card px-4 text-sm"
-                />
-                <button
-                  onClick={() =>
-                    start(async () => {
-                      const r = await pushImagesToWoo(product.id, true)
-                      setToast(r.ok ? { ok: true, text: r.message } : { ok: false, text: r.error })
-                    })
-                  }
-                  disabled={pending || confirmText !== requiredPhrase}
-                  className="h-9 cursor-pointer rounded-full bg-destructive px-4 text-sm font-medium text-white disabled:opacity-40"
-                >
-                  Αποστολή στο WooCommerce
-                </button>
-              </>
-            )}
-          </div>
-
-          {writesBlocked && (
-            <p className="mt-3 rounded-xl bg-[var(--warning)]/10 px-3 py-2 text-xs text-[var(--warning)]">
-              ⚠ Οι εγγραφές είναι κλειδωμένες. Για πραγματική αποστολή χρειάζεται
-              <code className="mx-1">WOO_ALLOW_WRITES=true</code> και
-              <code className="mx-1">WOO_DRY_RUN=false</code> στο .env.
-            </p>
           )}
+        </div>
+        <AttributeEditor value={attributes} disabled={!canEdit} onChange={setAttributes} />
+      </section>
 
-          {preview && (
-            <pre className="mt-3 max-h-80 overflow-auto rounded-xl bg-muted p-3 text-[11px]">
-{JSON.stringify(preview.plans.map(p => ({ locale: p.locale, wooId: p.wooId, url: p.plan.url, body: p.plan.body })), null, 2)}
-            </pre>
-          )}
+      {/* ── Push ─────────────────────────────────── */}
+      <WooPushPanel
+        title="Συγχρονισμός με το WooCommerce"
+        description="Επίλεξε τι θα σταλεί. Μετά την αποστολή το προϊόν διαβάζεται ξανά από το κατάστημα και συγκρίνεται πεδίο προς πεδίο — η απάντηση του WooCommerce στο PUT απλώς επαναλαμβάνει ό,τι στάλθηκε και δεν αποδεικνύει τίποτα."
+        gate={gate}
+        options={PUSH_OPTIONS}
+        warnings={preview?.warnings}
+        canPush={canPush}
+        pending={pending}
+        onPreview={scope => start(async () => {
+          const p = await previewProductPush(product.id, scope as PushScope)
+          setPreview(p)
+          setReports([])
+        })}
+        onPush={scope => start(async () => {
+          const r = await pushProductToWoo(product.id, scope as PushScope, true)
+          setReports(r.reports ?? [])
+          report(r)
+        })}
+        onVerify={() => start(async () => {
+          const r = await verifyAgainstWoo(product.id)
+          setReports(r.reports ?? [])
+          report(r)
+        })}
+      />
+
+      {reports.length > 0 && (
+        <section className="space-y-2">
+          <h3 className="font-display text-sm font-semibold">Έλεγχος ανάγνωσης από το WooCommerce</h3>
+          <VerdictTable reports={reports} />
         </section>
+      )}
+
+      {preview && (
+        <details className="rounded-2xl border border-border bg-card p-5">
+          <summary className="cursor-pointer text-sm font-medium">
+            Payload που θα σταλεί ({preview.plans.length} posts)
+          </summary>
+          <pre className="mt-3 max-h-96 overflow-auto rounded-xl bg-muted p-3 text-[11px]">
+{JSON.stringify(preview.plans.map(p => ({ locale: p.locale, url: p.plan.url, body: p.plan.body })), null, 2)}
+          </pre>
+        </details>
       )}
     </div>
   )
-}
-
-function Gate({ ok, label, warn }: { ok: boolean; label: string; warn?: boolean }) {
-  const cls = ok
-    ? 'bg-[var(--success)]/12 text-[var(--success)]'
-    : warn ? 'bg-[var(--warning)]/12 text-[var(--warning)]' : 'bg-muted text-muted-foreground'
-  return <span className={`rounded-full px-2 py-0.5 ${cls}`}>{ok ? '✓' : '●'} {label}</span>
 }
 
 function Field({ label, value, onChange, disabled }: {
