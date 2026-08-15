@@ -232,3 +232,73 @@ function norm(s: string): string {
     .replace(/\s+/g, ' ')
     .trim()
 }
+
+export type KeyCapability = {
+  canRead: boolean
+  canWrite: boolean
+  /** Plain-language explanation, ready to show a shop owner. */
+  detail: string
+}
+
+/**
+ * Asks the store whether our API key is allowed to write — WITHOUT writing.
+ *
+ * The probe is a PUT to a product id that cannot exist. WooCommerce checks
+ * authorisation before it looks anything up, so the two answers separate
+ * cleanly:
+ *
+ *   401 woocommerce_rest_authentication_error → the key is read-only
+ *   404 woocommerce_rest_product_invalid_id   → the key may write, but there
+ *                                               is no such product
+ *
+ * Nothing is created and nothing is modified on either path, which is why this
+ * is safe to run from a page load and is deliberately NOT behind the write
+ * gates: it is a question, not a change.
+ *
+ * This matters because the gates in .env and the permission on the key are two
+ * different locks. Opening the first while the second is shut produces a 401
+ * at the worst possible moment, halfway through a push.
+ */
+export async function checkKeyCapability(): Promise<KeyCapability> {
+  const { baseUrl, auth } = config()
+
+  const read = await fetch(`${baseUrl}/wp-json/wc/v3/products?per_page=1&_fields=id`, {
+    headers: { authorization: auth }, cache: 'no-store',
+  }).catch(() => null)
+
+  if (!read?.ok) {
+    return {
+      canRead: false,
+      canWrite: false,
+      detail: 'Δεν υπάρχει σύνδεση με το mylens.gr. Έλεγξε τη διεύθυνση και τα κλειδιά API.',
+    }
+  }
+
+  const probe = await fetch(`${baseUrl}/wp-json/wc/v3/products/999999999`, {
+    method: 'PUT',
+    headers: { authorization: auth, 'content-type': 'application/json' },
+    body: '{}',
+    cache: 'no-store',
+  }).catch(() => null)
+
+  if (!probe) {
+    return { canRead: true, canWrite: false, detail: 'Η δοκιμή δικαιωμάτων απέτυχε λόγω δικτύου.' }
+  }
+
+  if (probe.status === 401) {
+    return {
+      canRead: true,
+      canWrite: false,
+      detail:
+        'Το κλειδί API διαβάζει αλλά ΔΕΝ γράφει. Στο WordPress: WooCommerce → Ρυθμίσεις → '
+        + 'Για προχωρημένους → REST API → επεξεργασία του κλειδιού → Δικαιώματα: '
+        + '«Ανάγνωση/Εγγραφή».',
+    }
+  }
+
+  return {
+    canRead: true,
+    canWrite: true,
+    detail: 'Το κλειδί API επιτρέπει εγγραφή. Οι αποστολές θα γίνουν δεκτές από το κατάστημα.',
+  }
+}

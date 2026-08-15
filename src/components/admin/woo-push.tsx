@@ -4,6 +4,9 @@ import { useState } from 'react'
 
 export type Gate = { allowWrites: boolean; dryRun: boolean; environment: string }
 
+/** Result of the safe write-permission probe, when the page ran one. */
+export type KeyStatus = { canRead: boolean; canWrite: boolean; detail: string }
+
 export type Verdict = { field: string; sent: unknown; live: unknown; match: boolean }
 export type Report = { locale: string; wooId: number; verdicts: Verdict[]; ok: boolean }
 
@@ -28,7 +31,7 @@ export type ScopeOption<K extends string> = {
  */
 export function WooPushPanel<K extends string>({
   title, description, gate, options, warnings,
-  onPreview, onPush, onVerify, canPush, pending,
+  onPreview, onPush, onVerify, canPush, pending, keyStatus,
 }: {
   title: string
   description: string
@@ -40,6 +43,7 @@ export function WooPushPanel<K extends string>({
   onVerify?: () => void
   canPush: boolean
   pending: boolean
+  keyStatus?: KeyStatus
   }) {
   const [scope, setScope] = useState<Record<K, boolean>>(
     Object.fromEntries(options.map(o => [o.key, false])) as Record<K, boolean>,
@@ -57,19 +61,7 @@ export function WooPushPanel<K extends string>({
       <h2 className="font-display text-base font-semibold">{title}</h2>
       <p className="mt-1 text-sm text-muted-foreground">{description}</p>
 
-      <div className="mt-3 flex flex-wrap gap-2 text-xs">
-        <Badge ok={gate.allowWrites} label={`WOO_ALLOW_WRITES=${gate.allowWrites}`} />
-        <Badge ok={!gate.dryRun} label={`WOO_DRY_RUN=${gate.dryRun}`} />
-        <Badge ok={!production} warn label={`env=${gate.environment}`} />
-      </div>
-
-      {production && (
-        <p className="mt-3 rounded-xl bg-destructive/10 px-3 py-2 text-xs text-destructive">
-          ⚠ Το WOO_ENVIRONMENT είναι <strong>production</strong>. Αυτό είναι το ζωντανό
-          mylens.gr με πραγματικές παραγγελίες. Κάθε αποστολή είναι άμεση και δεν αναιρείται
-          από την εφαρμογή.
-        </p>
-      )}
+      <StatusLine gate={gate} keyStatus={keyStatus} />
 
       {warnings?.map(w => (
         <p key={w} className="mt-2 rounded-xl bg-[var(--warning)]/10 px-3 py-2 text-xs text-[var(--warning)]">
@@ -106,7 +98,7 @@ export function WooPushPanel<K extends string>({
           disabled={pending || chosen.length === 0}
           className="h-9 cursor-pointer rounded-full border border-border px-4 text-sm hover:bg-accent disabled:opacity-40"
         >
-          Προεπισκόπηση payload
+          Δες τι θα σταλεί
         </button>
 
         {onVerify && (
@@ -116,7 +108,7 @@ export function WooPushPanel<K extends string>({
             disabled={pending}
             className="h-9 cursor-pointer rounded-full border border-border px-4 text-sm hover:bg-accent disabled:opacity-40"
           >
-            Έλεγχος χωρίς εγγραφή
+            Σύγκρινε με το mylens.gr
           </button>
         )}
 
@@ -142,12 +134,27 @@ export function WooPushPanel<K extends string>({
       </div>
 
       {blocked && (
-        <p className="mt-3 rounded-xl bg-muted px-3 py-2 text-xs text-muted-foreground">
-          Οι εγγραφές είναι κλειδωμένες. Για πραγματική αποστολή χρειάζεται
-          <code className="mx-1">WOO_ALLOW_WRITES=true</code> και
-          <code className="mx-1">WOO_DRY_RUN=false</code>. Ο «Έλεγχος χωρίς εγγραφή»
-          δουλεύει κανονικά — είναι μόνο ανάγνωση.
-        </p>
+        <div className="mt-3 rounded-xl bg-muted px-3 py-2.5 text-xs text-muted-foreground">
+          <p className="font-medium text-foreground">Γιατί δεν μπορώ να στείλω τώρα;</p>
+          <ol className="mt-1.5 list-decimal space-y-1 pl-4">
+            {keyStatus && !keyStatus.canWrite && (
+              <li>
+                <strong>Το κλειδί API του καταστήματος δεν επιτρέπει εγγραφή.</strong> Αυτό
+                αλλάζει μόνο μέσα στο WordPress: WooCommerce → Ρυθμίσεις → Για προχωρημένους
+                → REST API → άνοιξε το κλειδί → Δικαιώματα: «Ανάγνωση/Εγγραφή».
+              </li>
+            )}
+            <li>
+              Ο διακόπτης ασφαλείας της εφαρμογής είναι κλειστός. Αλλάζει στις ρυθμίσεις του
+              server (<code>WOO_ALLOW_WRITES=true</code> και <code>WOO_DRY_RUN=false</code>),
+              όχι από αυτή τη σελίδα — σκόπιμα, ώστε να μην ανοίγει κατά λάθος με ένα κλικ.
+            </li>
+          </ol>
+          <p className="mt-2">
+            Στο μεταξύ τα δύο κουμπιά παραπάνω δουλεύουν κανονικά: δεν γράφουν τίποτα,
+            μόνο διαβάζουν.
+          </p>
+        </div>
       )}
       {!canPush && (
         <p className="mt-3 rounded-xl bg-muted px-3 py-2 text-xs text-muted-foreground">
@@ -155,6 +162,63 @@ export function WooPushPanel<K extends string>({
         </p>
       )}
     </section>
+  )
+}
+
+/**
+ * The state of play, in one line a shop owner can act on.
+ *
+ * The raw environment-variable names used to be printed here. They told a
+ * developer exactly what was wrong and told everybody else nothing, so the
+ * plain answer leads and the variable names are folded away for whoever has to
+ * change them on the server.
+ */
+function StatusLine({ gate, keyStatus }: { gate: Gate; keyStatus?: KeyStatus }) {
+  const blocked = !gate.allowWrites || gate.dryRun
+  const production = gate.environment === 'production'
+
+  const state = blocked
+    ? { icon: '🔒', label: 'Κλειδωμένο', cls: 'bg-muted text-muted-foreground',
+        text: 'Καμία αλλαγή δεν φεύγει προς το κατάστημα.' }
+    : { icon: '⚡', label: 'Ενεργό', cls: 'bg-destructive/10 text-destructive',
+        text: 'Οι αλλαγές που θα στείλεις εφαρμόζονται αμέσως στο κατάστημα.' }
+
+  return (
+    <div className="mt-3 space-y-2">
+      <p className="flex flex-wrap items-center gap-2 text-[13px]">
+        <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium ${state.cls}`}>
+          <span aria-hidden>{state.icon}</span>{state.label}
+        </span>
+        <span className="text-muted-foreground">{state.text}</span>
+      </p>
+
+      {production && (
+        <p className="rounded-xl bg-destructive/10 px-3 py-2 text-xs text-destructive">
+          ⚠ Συνδεδεμένο στο <strong>ζωντανό mylens.gr</strong>, με πραγματικούς πελάτες και
+          παραγγελίες — όχι σε δοκιμαστικό αντίγραφο. Ό,τι σταλεί το βλέπουν αμέσως οι
+          επισκέπτες και δεν αναιρείται από εδώ.
+        </p>
+      )}
+
+      {keyStatus && (
+        <p className={`rounded-xl px-3 py-2 text-xs ${
+          keyStatus.canWrite
+            ? 'bg-[var(--success)]/12 text-[var(--success)]'
+            : 'bg-[var(--warning)]/12 text-[var(--warning)]'
+        }`}>
+          {keyStatus.canWrite ? '✓ ' : '⚠ '}{keyStatus.detail}
+        </p>
+      )}
+
+      <details className="text-xs text-muted-foreground">
+        <summary className="cursor-pointer">Τεχνικές λεπτομέρειες</summary>
+        <p className="mt-1 pl-4">
+          <code>WOO_ALLOW_WRITES={String(gate.allowWrites)}</code>{' · '}
+          <code>WOO_DRY_RUN={String(gate.dryRun)}</code>{' · '}
+          <code>WOO_ENVIRONMENT={gate.environment}</code>
+        </p>
+      </details>
+    </div>
   )
 }
 
@@ -213,9 +277,3 @@ function Excerpt({ value }: { value: unknown }) {
   return <span className="line-clamp-3 break-words">{s.length > 120 ? `${s.slice(0, 120)}…` : s}</span>
 }
 
-function Badge({ ok, label, warn }: { ok: boolean; label: string; warn?: boolean }) {
-  const cls = ok
-    ? 'bg-[var(--success)]/12 text-[var(--success)]'
-    : warn ? 'bg-destructive/10 text-destructive' : 'bg-muted text-muted-foreground'
-  return <span className={`rounded-full px-2 py-0.5 ${cls}`}>{ok ? '✓' : '●'} {label}</span>
-}

@@ -4,7 +4,7 @@ import { prisma } from '@/lib/prisma'
 import { can } from '@/lib/rbac'
 import { requirePermission } from '@/lib/rbac-server'
 import { isDeepSeekConfigured } from '@/lib/deepseek'
-import { readGate } from '@/lib/woo/write'
+import { checkKeyCapability, readGate } from '@/lib/woo/write'
 import { BrandEditor } from './brand-editor'
 
 export const dynamic = 'force-dynamic'
@@ -21,6 +21,10 @@ export default async function BrandDetailPage({ params }: { params: Promise<{ id
     },
   })
   if (!brand) notFound()
+
+  // A safe probe: a PUT to an id that cannot exist, which answers whether
+  // the API key may write without writing anything.
+  const keyStatus = await checkKeyCapability()
 
   return (
     <section className="space-y-4">
@@ -41,6 +45,7 @@ export default async function BrandDetailPage({ params }: { params: Promise<{ id
           description: t.description ?? '',
         }))}
         gate={readGate()}
+        keyStatus={keyStatus}
         canEdit={can(session, 'brand.edit')}
         canPush={can(session, 'sync.push')}
         deepseekReady={isDeepSeekConfigured()}

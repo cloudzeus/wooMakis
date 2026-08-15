@@ -3,7 +3,7 @@ import { notFound } from 'next/navigation'
 import { prisma } from '@/lib/prisma'
 import { requirePermission } from '@/lib/rbac-server'
 import { can } from '@/lib/rbac'
-import { readGate } from '@/lib/woo/write'
+import { checkKeyCapability, readGate } from '@/lib/woo/write'
 import { normalizeAttributes } from '@/lib/woo/attributes'
 import { isDeepSeekConfigured } from '@/lib/deepseek'
 import { ProductEditor } from './product-editor'
@@ -24,6 +24,10 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
   })
   if (!product) notFound()
 
+  // A safe probe: a PUT to an id that cannot exist, which answers whether
+  // the API key may write without writing anything.
+  const keyStatus = await checkKeyCapability()
+
   const gate = readGate()
 
   return (
@@ -41,6 +45,7 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
         canPush={can(session, 'sync.push')}
         deepseekReady={isDeepSeekConfigured()}
         gate={gate}
+        keyStatus={keyStatus}
         product={{
           id: product.id,
           wooGroupKey: product.wooGroupKey,
@@ -60,6 +65,7 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
             wooId: t.wooId,
             name: t.name,
             shortDescription: t.shortDescription ?? '',
+            description: t.description ?? '',
             permalink: t.permalink,
           })),
           attributes: normalizeAttributes(product.attributes),

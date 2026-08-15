@@ -16,18 +16,19 @@ import {
   SURFACE, SURFACE_PRODUCT, TEAL, TEAL_DEEP,
 } from '@/components/store/tokens'
 import type { StoreProduct } from '@/components/store/types'
+import { isEmptyHtml, sanitizeHtml } from '@/lib/sanitize-html'
 
-/** WooCommerce descriptions carry markup; render as text rather than dangerously. */
-function paragraphs(html: string | null): string[] {
-  if (!html) return []
-  return html
-    .replace(/<\/(p|div|li|br)>/gi, '\n')
-    .replace(/<[^>]*>/g, ' ')
-    .replace(/&nbsp;/g, ' ')
-    .replace(/&amp;/g, '&')
-    .split('\n')
-    .map(s => s.replace(/\s+/g, ' ').trim())
-    .filter(Boolean)
+/**
+ * Descriptions are authored as rich text and stored as HTML, so the formatting
+ * has to survive to the page or the editor is pointless.
+ *
+ * It is sanitised again HERE, at render, not only at save. The stored value can
+ * also arrive from a WooCommerce pull, where it was written by WordPress or a
+ * plugin and never passed through our save path — so the last thing to touch it
+ * before a customer sees it is the allowlist.
+ */
+function describe(html: string | null): string {
+  return html ? sanitizeHtml(html) : ''
 }
 
 export function ProductView({
@@ -44,9 +45,9 @@ export function ProductView({
 
   const img = product.images[active] ?? product.images[0]
   const out = product.stockStatus !== 'instock'
-  const body = paragraphs(product.description) .length
-    ? paragraphs(product.description)
-    : paragraphs(product.shortDescription)
+  const body = !isEmptyHtml(describe(product.description))
+    ? describe(product.description)
+    : describe(product.shortDescription)
 
     // Any product with something to choose uses the picker, not just lenses:
   // a hat needs its size selected before it can be bought.
@@ -264,7 +265,7 @@ export function ProductView({
       </div>
 
       {/* Description */}
-      {body.length > 0 && (
+      {!isEmptyHtml(body) && (
         <section className="mt-4 p-8 sm:p-11" style={{ background: SURFACE, borderRadius: R_CARD }}>
           <h2
             className="mb-5 font-store-display font-black text-[26px] uppercase tracking-[-0.005em]"
@@ -272,13 +273,14 @@ export function ProductView({
           >
             Περιγραφή
           </h2>
-          <div className="max-w-[68ch] space-y-3.5">
-            {body.map((para, i) => (
-              <p key={i} className="text-[15px] leading-[1.7]" style={{ color: INK_MUTED }}>
-                {para}
-              </p>
-            ))}
-          </div>
+          <div
+            className="woo-prose max-w-[68ch] text-[15px] leading-[1.7]"
+            style={{ color: INK_MUTED }}
+            // Safe by construction: sanitizeHtml drops every tag outside a
+            // small allowlist, every attribute except a checked href, and all
+            // scripts and event handlers. Tested in tests/sanitize-html.test.ts.
+            dangerouslySetInnerHTML={{ __html: body }}
+          />
         </section>
       )}
 

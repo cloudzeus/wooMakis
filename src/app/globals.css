@@ -1686,3 +1686,33 @@ input[type='checkbox'] {
   --mr-failed: #e66767;
   --mr-failed-soft: rgb(230 103 103 / 18%);
 }
+
+/* Rich text editor and storefront description rendering.
+   The admin's Tailwind reset removes list markers and heading sizes, which is
+   right for UI chrome and wrong inside an editor: staff pressing the list
+   button would see no bullets appear. */
+.woo-rich-text p,
+.woo-prose p { margin-block: 0.5rem; }
+.woo-rich-text h2,
+.woo-prose h2 { font-size: 1.15em; font-weight: 700; margin-block: 0.8rem 0.35rem; }
+.woo-rich-text h3,
+.woo-prose h3 { font-size: 1.05em; font-weight: 600; margin-block: 0.7rem 0.3rem; }
+.woo-rich-text ul,
+.woo-prose ul { list-style: disc; padding-inline-start: 1.4rem; margin-block: 0.5rem; }
+.woo-rich-text ol,
+.woo-prose ol { list-style: decimal; padding-inline-start: 1.6rem; margin-block: 0.5rem; }
+.woo-rich-text li,
+.woo-prose li { margin-block: 0.15rem; }
+.woo-rich-text a,
+.woo-prose a { text-decoration: underline; }
+.woo-rich-text blockquote,
+.woo-prose blockquote {
+  border-inline-start: 3px solid currentColor;
+  opacity: 0.85;
+  padding-inline-start: 0.8rem;
+  margin-block: 0.6rem;
+}
+.woo-rich-text:empty::before {
+  content: attr(data-placeholder);
+  opacity: 0.5;
+}

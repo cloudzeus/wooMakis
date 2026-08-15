@@ -3,8 +3,9 @@
 import { useRef, useState, useTransition } from 'react'
 import type { WooAttribute } from '@/lib/woo/attributes'
 import {
-  VerdictTable, WooPushPanel, type Gate, type Report,
+  VerdictTable, WooPushPanel, type Gate, type KeyStatus, type Report,
 } from '@/components/admin/woo-push'
+import { RichText } from '@/components/admin/rich-text'
 import { AttributeEditor } from './attribute-editor'
 import { ImageSorter } from './image-sorter'
 import {
@@ -17,7 +18,10 @@ type Img = {
   assetId: string; cdnUrl: string; mimeType: string; bytes: number
   width: number | null; height: number | null; position: number; alt: string | null
 }
-type Tr = { locale: string; wooId: number | null; name: string; shortDescription: string; permalink: string | null }
+type Tr = {
+  locale: string; wooId: number | null; name: string
+  shortDescription: string; description: string; permalink: string | null
+}
 type Product = {
   id: string; wooGroupKey: number; sku: string; type: string; status: string
   price: string; regularPrice: string; onSale: boolean
@@ -27,22 +31,23 @@ type Product = {
 
 const PUSH_OPTIONS = [
   { key: 'content' as const, label: 'Ονόματα και περιγραφές',
-    hint: 'Ξεχωριστά ανά γλώσσα — κάθε μετάφραση είναι δικό της post στο WordPress.' },
+    hint: 'Κάθε γλώσσα ενημερώνεται ξεχωριστά.' },
   { key: 'pricing' as const, label: 'SKU, τιμή, κατάσταση, απόθεμα',
-    hint: 'Η τιμή πώλησης δεν στέλνεται: το Woo την υπολογίζει από την κανονική τιμή.' },
+    hint: 'Στέλνεται η κανονική τιμή. Την τιμή προσφοράς τη βγάζει μόνο του το WooCommerce.' },
   { key: 'attributes' as const, label: 'Χαρακτηριστικά',
-    hint: 'Το WooCommerce ΑΝΤΙΚΑΘΙΣΤΑ όλο το σύνολο — στέλνονται πάντα όλα.' },
+    hint: 'Στέλνονται όλα μαζί και αντικαθιστούν όσα υπάρχουν τώρα στο κατάστημα.' },
   { key: 'images' as const, label: 'Εικόνες',
-    hint: 'Το WordPress τις κατεβάζει από το Bunny. Αντικαθιστά όλη τη συλλογή.' },
+    hint: 'Όλη η συλλογή αντικαθίσταται, με τη σειρά που τη βλέπεις παραπάνω.' },
 ]
 
 export function ProductEditor({
-  product, canEdit, canUpload, canDelete, canPush, gate, deepseekReady,
+  product, canEdit, canUpload, canDelete, canPush, gate, deepseekReady, keyStatus,
 }: {
   product: Product
   canEdit: boolean; canUpload: boolean; canDelete: boolean; canPush: boolean
   gate: Gate
   deepseekReady: boolean
+  keyStatus?: KeyStatus
 }) {
   const [pending, start] = useTransition()
   const [toast, setToast] = useState<{ ok: boolean; text: string } | null>(null)
@@ -57,7 +62,10 @@ export function ProductEditor({
     regularPrice: product.regularPrice,
     stockStatus: product.stockStatus,
     translations: product.translations.map(t => ({
-      locale: t.locale, name: t.name, shortDescription: t.shortDescription,
+      locale: t.locale,
+      name: t.name,
+      shortDescription: t.shortDescription,
+      description: t.description,
     })),
   })
   const [attributes, setAttributes] = useState<WooAttribute[]>(product.attributes)
@@ -138,7 +146,7 @@ export function ProductEditor({
       </section>
 
       {/* ── Fields ───────────────────────────────── */}
-      <section className="grid gap-4 lg:grid-cols-2">
+      <section className="grid gap-4">
         <div className="rounded-2xl border border-border bg-card p-5">
           <h2 className="mb-3 font-display text-base font-semibold">Στοιχεία</h2>
           <div className="grid gap-3 sm:grid-cols-2">
@@ -188,7 +196,7 @@ export function ProductEditor({
               ⚠ Η αυτόματη μετάφραση απαιτεί <code>DEEPSEEK_API_KEY</code> στο .env.
             </p>
           )}
-          <div className="space-y-4">
+          <div className="grid gap-6 lg:grid-cols-2">
             {form.translations.map((t, i) => {
               const meta = product.translations.find(x => x.locale === t.locale)
               return (
@@ -206,11 +214,28 @@ export function ProductEditor({
                       const next = [...form.translations]; next[i] = { ...t, name: v }
                       setForm({ ...form, translations: next })
                     }} />
-                  <Field label="Σύντομη περιγραφή" value={t.shortDescription} disabled={!canEdit}
+                  <RichText
+                    label="Σύντομη περιγραφή"
+                    value={t.shortDescription}
+                    disabled={!canEdit}
+                    rows={4}
+                    help="Εμφανίζεται δίπλα στην τιμή, πάνω από το κουμπί αγοράς."
                     onChange={v => {
                       const next = [...form.translations]; next[i] = { ...t, shortDescription: v }
                       setForm({ ...form, translations: next })
-                    }} />
+                    }}
+                  />
+                  <RichText
+                    label="Πλήρης περιγραφή"
+                    value={t.description}
+                    disabled={!canEdit}
+                    rows={10}
+                    help="Το κείμενο κάτω από το προϊόν, στην καρτέλα «Περιγραφή»."
+                    onChange={v => {
+                      const next = [...form.translations]; next[i] = { ...t, description: v }
+                      setForm({ ...form, translations: next })
+                    }}
+                  />
                 </div>
               )
             })}
@@ -245,8 +270,9 @@ export function ProductEditor({
       {/* ── Push ─────────────────────────────────── */}
       <WooPushPanel
         title="Συγχρονισμός με το WooCommerce"
-        description="Επίλεξε τι θα σταλεί. Μετά την αποστολή το προϊόν διαβάζεται ξανά από το κατάστημα και συγκρίνεται πεδίο προς πεδίο — η απάντηση του WooCommerce στο PUT απλώς επαναλαμβάνει ό,τι στάλθηκε και δεν αποδεικνύει τίποτα."
+        description="Οι αλλαγές που κάνεις εδώ μένουν σε αυτή την εφαρμογή. Από εδώ τις στέλνεις στο mylens.gr. Μετά την αποστολή το προϊόν ξαναδιαβάζεται από το κατάστημα και συγκρίνεται πεδίο προς πεδίο, ώστε να δεις ότι όντως άλλαξε."
         gate={gate}
+        keyStatus={keyStatus}
         options={PUSH_OPTIONS}
         warnings={preview?.warnings}
         canPush={canPush}

@@ -1,11 +1,11 @@
 'use client'
 
 import { TermEditor, type TermTranslation } from '@/components/admin/term-editor'
-import type { Gate } from '@/components/admin/woo-push'
+import type { Gate, KeyStatus } from '@/components/admin/woo-push'
 import { previewBrandPush, pushBrand, saveBrand, translateBrand, verifyBrand } from './actions'
 
 export function BrandEditor({
-  id, subtitle, translations, gate, canEdit, canPush, deepseekReady,
+  id, subtitle, translations, gate, canEdit, canPush, deepseekReady, keyStatus,
 }: {
   id: string
   subtitle: string
@@ -14,6 +14,7 @@ export function BrandEditor({
   canEdit: boolean
   canPush: boolean
   deepseekReady: boolean
+  keyStatus?: KeyStatus
 }) {
   return (
     <TermEditor
@@ -21,6 +22,7 @@ export function BrandEditor({
       subtitle={subtitle}
       translations={translations}
       gate={gate}
+      keyStatus={keyStatus}
       canEdit={canEdit}
       canPush={canPush}
       deepseekReady={deepseekReady}

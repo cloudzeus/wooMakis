@@ -13,6 +13,7 @@ import {
 import { isDeepSeekConfigured, translateProductFields } from '@/lib/deepseek'
 import { normalizeAttributes, toWooPayload } from '@/lib/woo/attributes'
 import { slugify } from '@/lib/slug'
+import { isEmptyHtml, sanitizeHtml } from '@/lib/sanitize-html'
 
 export type ActionResult =
   | { ok: true; message: string }
@@ -27,7 +28,7 @@ export async function saveProductFields(
     price: string
     regularPrice: string
     stockStatus: string
-    translations: { locale: string; name: string; shortDescription: string }[]
+    translations: { locale: string; name: string; shortDescription: string; description: string }[]
   },
 ): Promise<ActionResult> {
   await requirePermission('product.edit')
@@ -52,9 +53,18 @@ export async function saveProductFields(
   })
 
   for (const t of form.translations) {
+    // Sanitised HERE, on the server. The editor sanitises too, but a server
+    // action receives whatever the caller sends and the caller need not be
+    // our form.
+    const short = sanitizeHtml(t.shortDescription)
+    const long = sanitizeHtml(t.description)
     await prisma.productTranslation.updateMany({
       where: { productId, locale: t.locale },
-      data: { name: t.name.trim(), shortDescription: t.shortDescription.trim() || null },
+      data: {
+        name: t.name.trim(),
+        shortDescription: isEmptyHtml(short) ? null : short,
+        description: isEmptyHtml(long) ? null : long,
+      },
     })
   }
 

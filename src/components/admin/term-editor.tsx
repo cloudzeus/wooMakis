@@ -1,7 +1,8 @@
 'use client'
 
 import { useState, useTransition } from 'react'
-import { VerdictTable, WooPushPanel, type Gate, type Report } from '@/components/admin/woo-push'
+import { RichText } from '@/components/admin/rich-text'
+import { VerdictTable, WooPushPanel, type Gate, type KeyStatus, type Report } from '@/components/admin/woo-push'
 
 export type TermTranslation = {
   locale: string
@@ -31,7 +32,7 @@ const PUSH_OPTIONS = [{
  * record shape upstream, and the only thing that differs is the wording.
  */
 export function TermEditor({
-  kind, subtitle, translations, actions, gate, canEdit, canPush, deepseekReady,
+  kind, subtitle, translations, actions, gate, canEdit, canPush, deepseekReady, keyStatus,
 }: {
   kind: 'category' | 'brand'
   subtitle: string
@@ -41,6 +42,7 @@ export function TermEditor({
   canEdit: boolean
   canPush: boolean
   deepseekReady: boolean
+  keyStatus?: KeyStatus
 }) {
   const [pending, start] = useTransition()
   const [toast, setToast] = useState<{ ok: boolean; text: string } | null>(null)
@@ -142,18 +144,15 @@ export function TermEditor({
                   />
                 </label>
 
-                <label className="block space-y-1">
-                  <span className="block text-xs font-medium uppercase tracking-wide text-muted-foreground">Περιγραφή</span>
-                  <textarea
-                    value={t.description}
-                    disabled={!canEdit}
-                    rows={5}
-                    onChange={e => {
-                      const next = [...form]; next[i] = { ...t, description: e.target.value }; setForm(next)
-                    }}
-                    className="w-full rounded-xl border border-border bg-card px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ring disabled:opacity-60"
-                  />
-                </label>
+                <RichText
+                  label="Περιγραφή"
+                  value={t.description}
+                  disabled={!canEdit}
+                  rows={6}
+                  onChange={v => {
+                    const next = [...form]; next[i] = { ...t, description: v }; setForm(next)
+                  }}
+                />
               </div>
             )
           })}
@@ -169,8 +168,9 @@ export function TermEditor({
 
       <WooPushPanel
         title="Συγχρονισμός με το WooCommerce"
-        description="Μετά την αποστολή ο όρος διαβάζεται ξανά από το κατάστημα και συγκρίνεται πεδίο προς πεδίο."
+        description="Οι αλλαγές μένουν εδώ μέχρι να τις στείλεις. Μετά την αποστολή ξαναδιαβάζονται από το κατάστημα και συγκρίνονται, ώστε να δεις ότι όντως άλλαξαν."
         gate={gate}
+        keyStatus={keyStatus}
         options={PUSH_OPTIONS}
         warnings={preview?.warnings}
         canPush={canPush}

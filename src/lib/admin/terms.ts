@@ -1,5 +1,6 @@
 import { prisma } from '@/lib/prisma'
 import { isDeepSeekConfigured, translateTermFields } from '@/lib/deepseek'
+import { isEmptyHtml, sanitizeHtml } from '@/lib/sanitize-html'
 import {
   executeUpdate, planUpdate, readBack, readGate, verifyFields,
   type FieldVerdict, type WooResource, type WritePlan,
@@ -46,7 +47,13 @@ export async function saveTerm(
   }
 
   for (const t of translations) {
-    const data = { name: t.name.trim(), description: t.description.trim() || null }
+    // Server-side sanitising, for the same reason as products: the action is
+    // the boundary, not the form.
+    const description = sanitizeHtml(t.description)
+    const data = {
+      name: t.name.trim(),
+      description: isEmptyHtml(description) ? null : description,
+    }
     if (kind === 'category') {
       await prisma.categoryTranslation.updateMany({
         where: { categoryId: id, locale: t.locale }, data,
