@@ -59,20 +59,6 @@ export function EditorialBand({
           να είναι ακριβώς αυτό που υπόσχεται η συσκευασία.
         </p>
 
-        <ul className="mt-8 space-y-4">
-          {points.map(({ icon: Icon, text }) => (
-            <li key={text} className="flex items-start gap-3">
-              <span
-                className="mt-0.5 grid h-8 w-8 shrink-0 place-items-center rounded-full"
-                style={{ background: DARK_SURFACE, color: TEAL }}
-              >
-                <Icon size={ICON_SM} />
-              </span>
-              <span className="text-[14.5px]" style={{ color: ON_DARK }}>{text}</span>
-            </li>
-          ))}
-        </ul>
-
         <div className="mt-10 border-t pt-8" style={{ borderColor: HAIRLINE_ON_DARK }}>
           <Link
             href="/proionta"

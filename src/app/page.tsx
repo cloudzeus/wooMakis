@@ -8,6 +8,7 @@ import { HeroMotion } from '@/components/store/hero-motion'
 import { Marquee } from '@/components/store/marquee'
 import { PromoBanners, type BannerCat } from '@/components/store/promo-banners'
 import { EditorialBand } from '@/components/store/editorial-band'
+import { HeroVisual, TrustBand } from '@/components/store/hero-visual'
 import { ArrowRight, ICON_MD, ICON_SM, Sparkle } from '@/components/store/icons'
 import { Reveal } from '@/components/store/reveal'
 import {
@@ -21,7 +22,7 @@ export const dynamic = 'force-dynamic'
 type WooAttribute = { name?: string; options?: string[] }
 
 export default async function HomePage() {
-  const [rows, categories, productCount, cartCount, brands, editorialAsset, bannerRows] = await Promise.all([
+  const [rows, categories, productCount, cartCount, brands, slotAssets, bannerRows] = await Promise.all([
     prisma.product.findMany({
       where: { status: 'publish', images: { some: {} } },
       orderBy: [{ featured: 'desc' }, { totalSales: 'desc' }],
@@ -46,8 +47,11 @@ export default async function HomePage() {
       take: 16,
       include: { translations: true },
     }),
-    // Whatever the admin assigned to the editorial slot, if anything.
-    prisma.mediaAsset.findUnique({ where: { slot: 'editorial-hero' }, select: { cdnUrl: true, altText: true } }),
+    // Every assigned storefront slot in one query.
+    prisma.mediaAsset.findMany({
+      where: { slot: { not: null } },
+      select: { slot: true, cdnUrl: true, altText: true },
+    }),
     // One representative product image per category, for the banner band.
     prisma.category.findMany({
       orderBy: { count: 'desc' },
@@ -97,6 +101,11 @@ export default async function HomePage() {
     count: c._count.products,
     imageUrl: c.products[0]?.product.images[0]?.asset.cdnUrl ?? null,
   }))
+
+  const slots = new Map(slotAssets.map(a => [a.slot!, a]))
+  const heroVisual = slots.get('hero-visual')
+  const editorialAsset = slots.get('editorial-hero')
+  const trustVisual = slots.get('trust-visual')
 
   const hero = products[0]
 
@@ -198,6 +207,11 @@ export default async function HomePage() {
         </section>
         </HeroMotion>
 
+        <HeroVisual
+          imageUrl={heroVisual?.cdnUrl ?? null}
+          alt={heroVisual?.altText ?? ''}
+        />
+
         {/* ── Promo ticker ── */}
         <Marquee
           className="mt-3 py-4"
@@ -227,6 +241,8 @@ export default async function HomePage() {
 
         {/* ── Products ── */}
         <HomeShowcase products={products} />
+
+        <TrustBand imageUrl={trustVisual?.cdnUrl ?? null} alt={trustVisual?.altText ?? ''} />
 
         {/* One deliberate dark band. See editorial-band.tsx for why. */}
         <EditorialBand
