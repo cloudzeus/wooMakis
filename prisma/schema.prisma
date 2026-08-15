@@ -183,6 +183,13 @@ model ProductCategory {
   @@index([categoryId])
 }
 
+enum MediaKind {
+  /// Mirrored from a WooCommerce product image.
+  PRODUCT
+  /// Uploaded through the admin media library.
+  LIBRARY
+}
+
 model MediaAsset {
   id          String    @id @default(cuid())
   /// SHA-256 of the original bytes — the dedupe and idempotency key.
@@ -199,9 +206,17 @@ model MediaAsset {
   mirroredAt  DateTime?
   createdAt   DateTime  @default(now())
 
+  kind    MediaKind @default(PRODUCT)
+  title   String?
+  altText String?
+  /// Names a fixed position on the storefront, e.g. "editorial-hero". Unique so
+  /// a slot resolves to exactly one asset; null for ordinary library images.
+  slot    String?   @unique
+
   products ProductImage[]
 
   @@index([sourceUrl])
+  @@index([kind])
 }
 
 model ProductImage {

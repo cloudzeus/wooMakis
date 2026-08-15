@@ -16,7 +16,14 @@ import {
  * The photograph is what makes it work. A dark band of pure typography would
  * just be a dark rectangle.
  */
-export function EditorialBand({ imageUrl }: { imageUrl: string }) {
+export function EditorialBand({
+  imageUrl, alt, isPlaceholder,
+}: {
+  imageUrl: string
+  alt: string
+  /** True while no asset is assigned to the editorial slot in Πολυμέσα. */
+  isPlaceholder?: boolean
+}) {
   const points = [
     { icon: CheckCircle, text: 'Γνήσια προϊόντα από επίσημους διανομείς' },
     { icon: Truck, text: 'Αποστολή σε όλη την Ελλάδα σε 1 έως 3 ημέρες' },
@@ -30,10 +37,11 @@ export function EditorialBand({ imageUrl }: { imageUrl: string }) {
       <div className="relative min-h-[320px] lg:min-h-[520px]">
         <Image
           src={imageUrl}
-          alt="Γυναίκα που φοράει γυαλιά οράσεως"
+          alt={alt}
           fill
           sizes="(max-width: 1024px) 100vw, 50vw"
           className="object-cover"
+          unoptimized={isPlaceholder}
         />
       </div>
 

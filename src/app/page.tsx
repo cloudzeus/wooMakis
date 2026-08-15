@@ -21,7 +21,7 @@ export const dynamic = 'force-dynamic'
 type WooAttribute = { name?: string; options?: string[] }
 
 export default async function HomePage() {
-  const [rows, categories, productCount, cartCount, brands, bannerRows] = await Promise.all([
+  const [rows, categories, productCount, cartCount, brands, editorialAsset, bannerRows] = await Promise.all([
     prisma.product.findMany({
       where: { status: 'publish', images: { some: {} } },
       orderBy: [{ featured: 'desc' }, { totalSales: 'desc' }],
@@ -46,6 +46,8 @@ export default async function HomePage() {
       take: 16,
       include: { translations: true },
     }),
+    // Whatever the admin assigned to the editorial slot, if anything.
+    prisma.mediaAsset.findUnique({ where: { slot: 'editorial-hero' }, select: { cdnUrl: true, altText: true } }),
     // One representative product image per category, for the banner band.
     prisma.category.findMany({
       orderBy: { count: 'desc' },
@@ -227,7 +229,11 @@ export default async function HomePage() {
         <HomeShowcase products={products} />
 
         {/* One deliberate dark band. See editorial-band.tsx for why. */}
-        <EditorialBand imageUrl="https://picsum.photos/seed/mylens-eyewear-portrait/1200/1400" />
+        <EditorialBand
+          imageUrl={editorialAsset?.cdnUrl ?? 'https://picsum.photos/seed/mylens-eyewear-portrait/1200/1400'}
+          alt={editorialAsset?.altText ?? 'Φωτογραφία μάρκας'}
+          isPlaceholder={!editorialAsset}
+        />
 
         {/* Categories */}
         <Reveal className="mt-3 p-8 sm:p-11" as="section" stagger={0.05}>

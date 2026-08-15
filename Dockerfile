@@ -56,6 +56,15 @@ RUN npm run build
 FROM base AS runner
 WORKDIR /app
 
+# ffmpeg is a system binary, not an npm package, so it does not arrive with
+# node_modules. The media library re-encodes video with it; without it, image
+# uploads still work and the UI says video is unavailable rather than failing at
+# upload time. Costs roughly 100 MB - the alternative is uploading raw phone
+# footage straight to the CDN.
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends ffmpeg \
+ && rm -rf /var/lib/apt/lists/*
+
 ENV NODE_ENV=production \
     PORT=3000 \
     HOSTNAME=0.0.0.0
