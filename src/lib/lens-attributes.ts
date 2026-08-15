@@ -103,7 +103,34 @@ export function splitAttributes(attributes: ProductAttribute[]): AttributeSplit 
   // the way the fulfilment team already expects it to.
   perEye.sort((a, b) => lensFieldOrder(a.name) - lensFieldOrder(b.name))
 
-  return { perEye, choices, fixed }
+  return {
+    perEye: perEye.map(sortNumericOptions),
+    choices: choices.map(sortNumericOptions),
+    fixed,
+  }
+}
+
+/** Matches "0", "-2.50", "+1.75", "14.4" — a signed decimal and nothing else. */
+const NUMERIC = /^[+-]?\d+(\.\d+)?$/
+
+/**
+ * Puts numeric option lists in numeric order.
+ *
+ * WooCommerce returns attribute options sorted as text, which for a
+ * prescription is actively misleading: axis reads 0, 10, 100, 110, 120 … 20,
+ * and power puts "0" after "+6.00" instead of between −0.25 and +0.25. Someone
+ * scanning for their value gives up or picks the wrong one.
+ *
+ * Only lists where EVERY option is a bare number are reordered. Base curve
+ * mixes "8.30" with "8.30 (-)" — annotations that mark a curve stocked only for
+ * minus powers — and those two would tie under a numeric comparison, so that
+ * list keeps the order the store gave it.
+ */
+function sortNumericOptions(attribute: ProductAttribute): ProductAttribute {
+  if (attribute.options.length < 2 || !attribute.options.every(o => NUMERIC.test(o))) {
+    return attribute
+  }
+  return { ...attribute, options: [...attribute.options].sort((a, b) => Number(a) - Number(b)) }
 }
 
 /**
