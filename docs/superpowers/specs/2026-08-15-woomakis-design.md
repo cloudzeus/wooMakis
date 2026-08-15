@@ -25,12 +25,40 @@ basis of several design decisions and should be re-checked if the site changes.
 
 | Fact | Value |
 |---|---|
-| Products | 408 (369 `simple`, 38 `variable`, 0 grouped, 0 external) |
-| Categories | 20 |
+| Product posts | 408 (369 `simple`, 38 `variable`, 0 grouped, 0 external) |
+| — of which Greek | 207 |
+| — of which English | 201 |
+| Category posts | 20 (10 `el` + 10 `en`) |
 | Registered customers | 30 |
 | Orders | 1133 |
 | Unique images (first 100 products) | 213 → est. 600–900 total |
 | Page size that works | `per_page=100` (~900 KB/page with whitelist) |
+
+### 2.0 The site is multilingual (Polylang) — corrected 2026-08-15
+
+**This corrects an incorrect assumption in the original draft of this spec.** The site runs
+Polylang. Every product and category REST record carries:
+
+```json
+"lang": "el",
+"translations": { "el": 4308, "en": 4309 }
+```
+
+So the 408 product posts are **not** 408 distinct products — they are roughly 201
+translation pairs plus 6 Greek products that have no English counterpart. The same holds
+for categories: 10 logical categories, 20 posts.
+
+Consequences, all of which the data model and sync engine must respect:
+
+- The **logical entity is the translation group**, not the post. `Product` is one row per
+  group; each language's post is a `ProductTranslation` row carrying its own `wooId`.
+- Counting posts as products would **double the catalog** and show every item twice.
+- `?lang=el` / `?lang=en` filters any list endpoint; omitting it returns all languages.
+- Both languages are genuinely editable in WooCommerce, so **both can be pushed** — the
+  earlier rule "only `el` is pushed, `en` is local-only" was based on the wrong premise
+  and is withdrawn (see §5.1).
+- Translation coverage is incomplete (6 Greek products lack English). The admin needs to
+  surface that gap rather than silently render an empty English page.
 
 ### 2.1 Blocking defect in the source site — `_fields` whitelist is mandatory
 
@@ -144,13 +172,34 @@ Every synced entity carries three sync columns:
 successful pull and on every successful push, never by a local edit.
 
 Translatable text lives in separate per-locale tables — `ProductTranslation`,
-`CategoryTranslation` — keyed by `(entityId, locale)`. WooCommerce stores a single
-language per field; these tables let Greek and English diverge without either being
-clobbered on resync.
+`CategoryTranslation` — keyed by `(entityId, locale)`.
 
-**Push participation:** `el` is the Woo-authoritative locale. Only `el` translations are
-pushed to WooCommerce; `en` is local-only presentation data for the storefront and is
-never sent. This is a fixed rule, not a per-field setting.
+Because the source site is Polylang (§2.0), each translation row **maps to a real
+WooCommerce post** and therefore carries its own sync columns:
+
+```prisma
+model ProductTranslation {
+  productId     String
+  locale        String   // "el" | "en"
+  wooId         Int?     @unique   // the Polylang post for this language
+  wooModifiedAt DateTime?
+  wooSnapshot   Json?
+  name          String
+  slug          String
+  description   String?
+  shortDescription String?
+  @@id([productId, locale])
+}
+```
+
+The parent `Product` row holds only language-neutral data — SKU, type, price, stock,
+images, `wooGroupKey` (the lowest post id in the translation group, used as a stable
+identity). It has no `wooId` of its own, because no single post represents it.
+
+**Push participation:** both locales are pushable, each to its own post id. A row whose
+`wooId` is null is a translation that does not exist upstream yet; pushing it means
+*creating* a post and linking it into the Polylang translation group, which is a distinct
+operation from updating and is deliberately deferred to phase 4.
 
 ### 5.2 Customers
 
