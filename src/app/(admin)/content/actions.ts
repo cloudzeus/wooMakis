@@ -4,7 +4,7 @@ import { revalidatePath } from 'next/cache'
 import { prisma } from '@/lib/prisma'
 import { requirePermission } from '@/lib/rbac-server'
 import { LOCALES } from '@/lib/i18n'
-import { isDeepSeekConfigured, translateTermFields } from '@/lib/deepseek'
+import { isDeepSeekConfigured, translateDocument, translateTermFields } from '@/lib/deepseek'
 
 export type ContentResult = { ok: true; message: string } | { ok: false; error: string }
 
@@ -133,12 +133,9 @@ export async function translatePage(id: string, toLocale: string): Promise<Conte
 
   let translated
   try {
-    // The term prompt is reused: it preserves structure and adds nothing, which
-    // is exactly what legal text needs. A "make it flow better" prompt on terms
-    // and conditions is how a clause quietly changes meaning.
-    translated = await translateTermFields(
-      { name: source.title, description: source.body },
-      source.locale, toLocale, 'category',
+    translated = await translateDocument(
+      { title: source.title, summary: source.summary, body: source.body },
+      source.locale, toLocale,
     )
   } catch (err) {
     return { ok: false, error: err instanceof Error ? err.message : String(err) }
@@ -146,12 +143,17 @@ export async function translatePage(id: string, toLocale: string): Promise<Conte
 
   await prisma.contentPageTranslation.upsert({
     where: { pageId_locale: { pageId: id, locale: toLocale } },
-    update: { title: translated.name, body: translated.description ?? '' },
+    update: {
+      title: translated.title,
+      body: translated.body,
+      summary: translated.summary?.trim() || null,
+    },
     create: {
       pageId: id,
       locale: toLocale,
-      title: translated.name,
-      body: translated.description ?? '',
+      title: translated.title,
+      body: translated.body,
+      summary: translated.summary?.trim() || null,
     },
   })
 
@@ -276,18 +278,26 @@ export async function translateFaq(id: string, toLocale: string): Promise<Conten
   if (!source) return { ok: false, error: 'Δεν υπάρχει γλώσσα-πηγή.' }
 
   try {
-    const translated = await translateTermFields(
-      { name: source.question, description: source.answer },
-      source.locale, toLocale, 'category',
+    // The document prompt, not the term one: "keep the translation as short as
+    // the source" is right for a category label and wrong for a question, and
+    // it turned "Ποιοι τρόποι πληρωμής υποστηρίζονται;" into "Payment methods".
+    const translated = await translateDocument(
+      { title: source.question, summary: item.category, body: source.answer },
+      source.locale, toLocale,
     )
     await prisma.faqTranslation.upsert({
       where: { faqId_locale: { faqId: id, locale: toLocale } },
-      update: { question: translated.name, answer: translated.description ?? '' },
+      update: {
+        question: translated.title,
+        answer: translated.body,
+        category: translated.summary?.trim() || null,
+      },
       create: {
         faqId: id,
         locale: toLocale,
-        question: translated.name,
-        answer: translated.description ?? '',
+        question: translated.title,
+        answer: translated.body,
+        category: translated.summary?.trim() || null,
       },
     })
   } catch (err) {

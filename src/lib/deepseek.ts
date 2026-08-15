@@ -166,3 +166,67 @@ export async function translateTermFields(
   if (!parsed.name) throw new DeepSeekError('Η μετάφραση δεν περιείχε όνομα.')
   return parsed
 }
+
+export type TranslatableDocument = { title: string; summary?: string | null; body: string }
+
+/**
+ * Translates a long structured document — a terms page, a privacy policy.
+ *
+ * Separate from translateTermFields because the constraints are opposite. A
+ * term is a short label where brevity matters; a legal page is a document
+ * where the structure is load-bearing and where "improving" a sentence can
+ * change what a clause means. So this prompt forbids condensing, forbids
+ * reordering, and pins the three block markers the renderer understands.
+ *
+ * Square-bracket placeholders are left alone: they are slots for the company's
+ * own details and a translated placeholder would silently stop matching the
+ * ones an editor is searching for.
+ */
+export async function translateDocument(
+  doc: TranslatableDocument,
+  fromLocale: string,
+  toLocale: string,
+): Promise<TranslatableDocument> {
+  const from = LANGUAGE_NAMES[fromLocale] ?? fromLocale
+  const to = LANGUAGE_NAMES[toLocale] ?? toLocale
+
+  const system = [
+    `You translate legal and informational web pages for an optical retailer from ${from} to ${to}.`,
+    'This text is contractual. Accuracy outranks fluency.',
+    'Rules:',
+    '- Translate every sentence. Do not summarise, condense, merge or drop anything.',
+    '- Do not add sentences, explanations or disclaimers that are not in the source.',
+    '- Keep the structure line for line: a line starting with "## " stays a heading,',
+    '  a line starting with "- " stays a list item, blank lines stay blank lines.',
+    '- Leave text inside square brackets EXACTLY as it is, including the brackets.',
+    '  Those are placeholders for company details, not words to translate.',
+    '- Keep legal and technical terms precise: withdrawal, distance selling, VAT,',
+    '  data controller, medical device, base curve, diameter.',
+    '- Return ONLY a JSON object with keys: title, summary, body.',
+  ].join('\n')
+
+  const user = JSON.stringify({
+    title: doc.title,
+    summary: doc.summary ?? '',
+    body: doc.body,
+  })
+
+  const raw = await deepseekChat(
+    [{ role: 'system', content: system }, { role: 'user', content: user }],
+    // Legal pages run long; the default 2048 truncates them mid-clause.
+    { maxTokens: 8192, temperature: 0.1 },
+  )
+
+  const cleaned = raw.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '')
+
+  let parsed: TranslatableDocument
+  try {
+    parsed = JSON.parse(cleaned) as TranslatableDocument
+  } catch {
+    throw new DeepSeekError(`Η απάντηση δεν ήταν έγκυρο JSON: ${cleaned.slice(0, 200)}`)
+  }
+  if (!parsed.title || !parsed.body) {
+    throw new DeepSeekError('Η μετάφραση δεν περιείχε τίτλο ή κείμενο.')
+  }
+  return parsed
+}

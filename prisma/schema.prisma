@@ -592,6 +592,11 @@ model FaqTranslation {
   locale   String
   question String
   answer   String
+  /// The section heading in this language. Grouping still keys off
+  /// FaqItem.category, which stays stable; this is the label shown for it.
+  /// Null falls back to the item's own category, so a half-translated FAQ
+  /// shows a Greek heading rather than no heading.
+  category String?
 
   faq FaqItem @relation(fields: [faqId], references: [id], onDelete: Cascade)
 

@@ -91,13 +91,17 @@ export async function getFaq(locale: Locale): Promise<{ category: string; items:
     include: { translations: true },
   })
 
-  const groups = new Map<string, FaqEntry[]>()
+  // Grouped by FaqItem.category, which is stable across languages, but
+  // labelled from the translation. Grouping by the translated string instead
+  // would split one section into two the moment a single entry is translated.
+  const groups = new Map<string, { label: string; items: FaqEntry[] }>()
   for (const item of items) {
     const t = pickTranslation(item.translations, locale)
     if (!t) continue
-    const list = groups.get(item.category) ?? []
-    list.push({ id: item.id, category: item.category, question: t.question, answer: t.answer })
-    groups.set(item.category, list)
+    const group = groups.get(item.category) ?? { label: item.category, items: [] }
+    if (t.locale === locale && t.category) group.label = t.category
+    group.items.push({ id: item.id, category: item.category, question: t.question, answer: t.answer })
+    groups.set(item.category, group)
   }
-  return [...groups].map(([category, list]) => ({ category, items: list }))
+  return [...groups.values()].map(g => ({ category: g.label, items: g.items }))
 }
