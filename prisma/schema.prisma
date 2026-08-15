@@ -622,3 +622,67 @@ model CustomerAccount {
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
 }
+
+// ── Home page composition ────────────────────────────────
+// Which sections appear on the storefront home page, in what order, and with
+// what copy. Stored rather than hard-coded so the shop can reorder or retire a
+// band without a deployment — the same reason the legal pages live in the
+// database.
+
+enum HomeSectionKind {
+  HERO
+  TRUST
+  CATEGORIES
+  PRODUCTS
+  PANELS
+  BRANDS
+  NEWSLETTER
+}
+
+model HomeSection {
+  id        String          @id @default(cuid())
+  kind      HomeSectionKind @unique
+  enabled   Boolean         @default(true)
+  menuOrder Int             @default(0)
+
+  /**
+   * Which media slot supplies this section's image, when it uses one.
+   * Names a MediaAsset.slot rather than an asset id, so re-assigning the slot
+   * in the media library swaps the picture without touching this row.
+   */
+  imageSlot String?
+
+  /** Second image, for the two-panel band. */
+  imageSlotB String?
+
+  /** How many items to show, where the section is a list. */
+  itemLimit Int @default(6)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  translations HomeSectionTranslation[]
+
+  @@index([menuOrder])
+}
+
+model HomeSectionTranslation {
+  sectionId String
+  locale    String
+
+  /** Small uppercase label above the heading. */
+  eyebrow String?
+  title   String?
+  /** Supporting paragraph. */
+  body    String?
+  /** Primary call to action. */
+  ctaLabel String?
+  ctaHref  String?
+  /** Second call to action, where the design has one. */
+  ctaLabelB String?
+  ctaHrefB  String?
+
+  section HomeSection @relation(fields: [sectionId], references: [id], onDelete: Cascade)
+
+  @@id([sectionId, locale])
+}

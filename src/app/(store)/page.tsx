@@ -3,6 +3,7 @@ import { readCartCount } from '@/lib/cart'
 import { pickTranslation } from '@/lib/i18n'
 import { getT } from '@/lib/locale-server'
 import { getCustomerSession } from '@/lib/customer-auth'
+import { getHomeSections } from '@/lib/home-sections'
 import { StoreFooter, StoreHeader } from '@/components/store/store-header'
 import { StoreMotion } from '@/components/store/motion'
 import { ProductTabs, type TabProduct } from '@/components/store/product-tabs'
@@ -42,13 +43,21 @@ function groupOf(categories: string[]): string {
 
 export default async function HomePage() {
   const { locale } = await getT()
-  const [customer, cartCount] = await Promise.all([getCustomerSession(), readCartCount()])
+  const [customer, cartCount, sections] = await Promise.all([
+    getCustomerSession(), readCartCount(), getHomeSections(locale),
+  ])
+
+  // Enabled bands only, in the order the admin set. A missing kind simply does
+  // not render — the page composes from this list rather than from a fixed
+  // sequence of JSX.
+  const band = (kind: string) => sections.find(s => s.kind === kind)
+  const limitOf = (kind: string, fallback: number) => band(kind)?.itemLimit || fallback
 
   const [productRows, categoryRows, brandRows, productCount, slots] = await Promise.all([
     prisma.product.findMany({
       where: { status: 'publish', images: { some: {} } },
       orderBy: [{ featured: 'desc' }, { totalSales: 'desc' }],
-      take: 12,
+      take: 24,
       include: {
         translations: true,
         images: { include: { asset: true }, orderBy: { position: 'asc' }, take: 1 },
@@ -59,7 +68,7 @@ export default async function HomePage() {
     prisma.category.findMany({
       where: { products: { some: {} } },
       orderBy: { count: 'desc' },
-      take: 6,
+      take: 12,
       include: {
         translations: true,
         _count: { select: { products: true } },
@@ -73,7 +82,7 @@ export default async function HomePage() {
     prisma.brand.findMany({
       where: { products: { some: {} } },
       orderBy: { count: 'desc' },
-      take: 12,
+      take: 24,
       include: { translations: true },
     }),
     prisma.product.count({ where: { status: 'publish' } }),
@@ -124,53 +133,105 @@ export default async function HomePage() {
       .filter((n): n is string => !!n),
   )]
 
+  /**
+   * The second panel's copy is packed into the PANELS `body` field as
+   * "EYEBROW|TITLE". One band, two panels, and inventing a second set of
+   * translation columns for a single case was the worse trade.
+   */
+  const panelB = (body: string) => {
+    const [eyebrow, ...rest] = body.split('|')
+    return { eyebrow: eyebrow.trim(), title: rest.join('|').trim() }
+  }
+
+  const render = (kind: string) => {
+    const s = band(kind)
+    if (!s) return null
+
+    switch (kind) {
+      case 'HERO':
+        return (
+          <Hero
+            key={kind}
+            locale={locale}
+            image={slot(s.imageSlot ?? '')}
+            title={s.copy.title}
+            body={s.copy.body}
+            ctaLabel={s.copy.ctaLabel} ctaHref={s.copy.ctaHref}
+            ctaLabelB={s.copy.ctaLabelB} ctaHrefB={s.copy.ctaHrefB}
+            productCount={productCount}
+            brandCount={brands.length}
+          />
+        )
+      case 'TRUST':
+        return <TrustStrip key={kind} locale={locale} />
+      case 'CATEGORIES':
+        return (
+          <Categories
+            key={kind}
+            locale={locale}
+            title={s.copy.title}
+            ctaLabel={s.copy.ctaLabel}
+            ctaHref={s.copy.ctaHref}
+            items={categories.slice(0, limitOf(kind, 6))}
+          />
+        )
+      case 'PRODUCTS':
+        return (
+          <ProductTabs
+            key={kind}
+            locale={locale}
+            title={s.copy.title}
+            products={products.slice(0, limitOf(kind, 12))}
+          />
+        )
+      case 'PANELS': {
+        const b = panelB(s.copy.body)
+        return (
+          <section
+            key={kind}
+            className="grid grid-cols-[repeat(auto-fit,minmax(430px,1fr))] gap-6 pb-16 pt-12"
+            style={{ maxWidth: MAX_W, marginInline: 'auto', paddingInline: GUTTER }}
+          >
+            <LifestylePanel
+              image={slot(s.imageSlot ?? '')}
+              href={s.copy.ctaHref}
+              eyebrow={s.copy.eyebrow}
+              title={s.copy.title}
+              cta={s.copy.ctaLabel}
+            />
+            <LifestylePanel
+              image={slot(s.imageSlotB ?? '')}
+              href={s.copy.ctaHrefB}
+              eyebrow={b.eyebrow}
+              title={b.title}
+              cta={s.copy.ctaLabelB}
+            />
+          </section>
+        )
+      }
+      case 'BRANDS':
+        return <BrandMarquee key={kind} brands={brands.slice(0, limitOf(kind, 12))} />
+      case 'NEWSLETTER':
+        return (
+          <Newsletter
+            key={kind}
+            eyebrow={s.copy.eyebrow}
+            title={s.copy.title}
+            body={s.copy.body}
+            ctaLabel={s.copy.ctaLabel}
+            ctaHref={s.copy.ctaHref}
+          />
+        )
+      default:
+        return null
+    }
+  }
+
   return (
     <div className="overflow-x-hidden font-store" style={{ background: SURFACE, color: INK }}>
       <StoreMotion />
-
       <StoreHeader cartCount={cartCount} locale={locale} customerName={customer?.name} />
-
-      <Hero
-        locale={locale}
-        image={slot('hero-visual')}
-        productCount={productCount}
-        brandCount={brands.length}
-      />
-
-      <TrustStrip locale={locale} />
-
-      <Categories locale={locale} items={categories} />
-
-      <ProductTabs locale={locale} products={products} />
-
-      <section
-        className="grid grid-cols-[repeat(auto-fit,minmax(430px,1fr))] gap-6 pb-16 pt-12"
-        style={{ maxWidth: MAX_W, marginInline: 'auto', paddingInline: GUTTER }}
-      >
-        <LifestylePanel
-          image={slot('editorial-hero')}
-          href="/proionta"
-          eyebrow={locale === 'el' ? 'ΚΑΘΑΡΗ ΟΡΑΣΗ, ΚΑΘΕ ΜΕΡΑ' : 'CLEAR VISION, EVERY DAY'}
-          title={locale === 'el'
-            ? 'Ό,τι φοράς στα μάτια σου αξίζει προσοχή'
-            : 'Whatever you wear on your eyes deserves care'}
-          cta={locale === 'el' ? 'Δες τα προϊόντα' : 'Browse products'}
-        />
-        <LifestylePanel
-          image={slot('trust-visual')}
-          href="/syxnes-erotiseis"
-          eyebrow={locale === 'el' ? 'ΡΩΤΗΣΕ ΜΑΣ' : 'ASK US'}
-          title={locale === 'el'
-            ? 'Δεν ξέρεις ποιο υγρό ταιριάζει στους φακούς σου;'
-            : 'Not sure which solution suits your lenses?'}
-          cta={locale === 'el' ? 'Συχνές ερωτήσεις' : 'Read the FAQ'}
-        />
-      </section>
-
-      <BrandMarquee brands={brands} />
-
-      <Newsletter locale={locale} />
-
+      {sections.map(s => render(s.kind))}
       <StoreFooter locale={locale} />
     </div>
   )

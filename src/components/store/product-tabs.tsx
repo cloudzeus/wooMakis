@@ -35,7 +35,13 @@ export type TabProduct = {
  * under the EU Omnibus Directive, an unfair commercial practice. The real
  * stock status is shown instead.
  */
-export function ProductTabs({ locale, products }: { locale: Locale; products: TabProduct[] }) {
+export function ProductTabs({
+  locale, products, title,
+}: {
+  locale: Locale
+  products: TabProduct[]
+  title: string
+}) {
   const el = locale === 'el'
   const [tab, setTab] = useState<'all' | 'lens' | 'care'>('all')
 
@@ -59,7 +65,7 @@ export function ProductTabs({ locale, products }: { locale: Locale; products: Ta
       >
         <div className="flex flex-wrap items-center justify-between gap-4">
           <h2 className="ga m-0 text-[34px] font-extrabold" style={{ color: INK }}>
-            {el ? 'Δημοφιλή προϊόντα' : 'Popular products'}
+            {title}
           </h2>
           <div className="flex gap-2" role="group" aria-label={el ? 'Φίλτρο' : 'Filter'}>
             {tabs.map(x => {

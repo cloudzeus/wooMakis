@@ -23,10 +23,17 @@ const section = { maxWidth: MAX_W, marginInline: 'auto', paddingInline: GUTTER }
 // ── Hero ──────────────────────────────────────────────────
 
 export function Hero({
-  locale, image, productCount, brandCount,
+  locale, image, title, body, ctaLabel, ctaHref, ctaLabelB, ctaHrefB,
+  productCount, brandCount,
 }: {
   locale: Locale
   image: { url: string; alt: string } | null
+  title: string
+  body: string
+  ctaLabel: string
+  ctaHref: string
+  ctaLabelB: string
+  ctaHrefB: string
   productCount: number
   brandCount: number
 }) {
@@ -86,32 +93,39 @@ export function Hero({
           className="ht m-0 max-w-[640px] font-extrabold leading-[1.06] tracking-[-0.02em]"
           style={{ fontSize: 'clamp(34px,3.8vw,54px)', color: SURFACE }}
         >
-          {el ? 'Δες τη διαφορά ' : 'See the difference '}
-          <em className="not-italic" style={{ color: ACCENT }}>{el ? 'καθαρά.' : 'clearly.'}</em>
+          {/* The last word carries the accent, which is what gives the
+              headline its shape in the design. Splitting on the final space
+              keeps that working for whatever the shop types. */}
+          {title.split(' ').slice(0, -1).join(' ')}{' '}
+          <em className="not-italic" style={{ color: ACCENT }}>
+            {title.split(' ').slice(-1)}
+          </em>
         </h1>
 
         <p className="ht m-0 max-w-[430px] text-[15px] leading-[1.6] text-pretty"
            style={{ color: INK_ON_DARK }}>
-          {el
-            ? 'Φακοί επαφής, υγρά φροντίδας και γυαλιά ηλίου από επίσημους διανομείς. Γνήσια προϊόντα, αποστολή σε 1-3 ημέρες.'
-            : 'Contact lenses, care solutions and sunglasses from official distributors. Genuine products, delivered in 1-3 days.'}
+          {body}
         </p>
 
         <div className="ht flex items-center gap-3">
-          <Link
-            href="/proionta"
-            className="px-7 py-[13px] text-[14.5px] font-bold transition-colors hover:bg-[var(--hv)]"
-            style={{ background: SURFACE, color: INK, borderRadius: R_PILL, ['--hv' as string]: ACCENT }}
-          >
-            {el ? 'Ψώνισε τώρα' : 'Shop now'} →
-          </Link>
-          <Link
-            href="#katigories"
-            className="px-6 py-3 text-[14.5px] font-semibold"
-            style={{ border: `1.5px solid rgb(255 255 255 / 60%)`, color: SURFACE, borderRadius: R_PILL }}
-          >
-            {el ? 'Δες τις κατηγορίες' : 'Browse categories'}
-          </Link>
+          {ctaLabel && (
+            <Link
+              href={ctaHref || '/proionta'}
+              className="px-7 py-[13px] text-[14.5px] font-bold transition-colors hover:bg-[var(--hv)]"
+              style={{ background: SURFACE, color: INK, borderRadius: R_PILL, ['--hv' as string]: ACCENT }}
+            >
+              {ctaLabel} →
+            </Link>
+          )}
+          {ctaLabelB && (
+            <Link
+              href={ctaHrefB || '#katigories'}
+              className="px-6 py-3 text-[14.5px] font-semibold"
+              style={{ border: `1.5px solid rgb(255 255 255 / 60%)`, color: SURFACE, borderRadius: R_PILL }}
+            >
+              {ctaLabelB}
+            </Link>
+          )}
         </div>
 
         <p className="ht flex flex-wrap gap-6 text-[12.5px] font-medium" style={{ color: INK_ON_DARK_FAINT }}>
@@ -169,20 +183,28 @@ export function TrustStrip({ locale }: { locale: Locale }) {
 
 export type CategoryTile = { name: string; count: number; image: string | null; href: string }
 
-export function Categories({ locale, items }: { locale: Locale; items: CategoryTile[] }) {
+export function Categories({
+  locale, items, title, ctaLabel, ctaHref,
+}: {
+  locale: Locale
+  items: CategoryTile[]
+  title: string
+  ctaLabel: string
+  ctaHref: string
+}) {
   const el = locale === 'el'
   return (
     <section id="katigories" className="pb-16 pt-14" style={section}>
       <div className="mb-6 flex items-baseline justify-between gap-4">
         <h2 className="ga m-0 text-[34px] font-extrabold" style={{ color: INK }}>
-          {el ? 'Κατηγορίες' : 'Categories'}
+          {title}
         </h2>
         <Link
-          href="/proionta"
+          href={ctaHref || '/proionta'}
           className="border-b text-[14px] font-bold transition-colors hover:text-[var(--hv)] hover:border-[var(--hv)]"
           style={{ color: INK, borderColor: INK, ['--hv' as string]: SALE }}
         >
-          {el ? 'Δες τα όλα' : 'View all'} →
+          {ctaLabel} →
         </Link>
       </div>
 
@@ -219,7 +241,9 @@ export function Categories({ locale, items }: { locale: Locale; items: CategoryT
 export function BrandMarquee({ brands }: { brands: string[] }) {
   if (brands.length === 0) return null
   return (
-    <div className="overflow-hidden border-y py-4" style={{ background: CANVAS, borderColor: HAIRLINE }}>
+    // mt-4 so the band does not butt against whatever sits above it — with the
+    // panels directly before, the two read as one glued block otherwise.
+    <div className="mt-4 overflow-hidden border-y py-5" style={{ background: CANVAS, borderColor: HAIRLINE }}>
       <div className="marquee-track items-baseline whitespace-nowrap" style={{ animationDuration: '38s' }}>
         {[0, 1].map(copy => (
           <span key={copy} className="flex items-baseline" aria-hidden={copy === 1 || undefined}>
@@ -300,8 +324,15 @@ export function LifestylePanel({
 
 // ── Newsletter ────────────────────────────────────────────
 
-export function Newsletter({ locale }: { locale: Locale }) {
-  const el = locale === 'el'
+export function Newsletter({
+  eyebrow, title, body, ctaLabel, ctaHref,
+}: {
+  eyebrow: string
+  title: string
+  body: string
+  ctaLabel: string
+  ctaHref: string
+}) {
   return (
     <section className="pb-20" style={section}>
       <div
@@ -313,30 +344,28 @@ export function Newsletter({ locale }: { locale: Locale }) {
         <span aria-hidden className="ring-spin-slow absolute -right-[70px] -top-[70px] size-[240px] rounded-full"
               style={{ border: `1px dashed ${HAIRLINE_ON_DARK}` }} />
 
-        <span className="text-[12px] font-bold uppercase tracking-[0.2em]" style={{ color: ACCENT }}>
-          {el ? 'ΕΝΗΜΕΡΩΣΗ' : 'STAY IN TOUCH'}
+        <span className="relative z-[1] text-[12px] font-bold uppercase tracking-[0.2em]" style={{ color: ACCENT }}>
+          {eyebrow}
         </span>
         <h2
           className="relative z-[1] m-0 max-w-[680px] font-extrabold leading-[1.15]"
           style={{ fontSize: 'clamp(30px,3.4vw,44px)', color: SURFACE }}
         >
-          {el ? 'Υπενθυμίσεις αντικατάστασης φακών' : 'Lens replacement reminders'}
+          {title}
         </h2>
-        <p className="m-0 max-w-[520px] text-[15px]" style={{ color: INK_ON_DARK_FAINT }}>
-          {el
-            ? 'Σου θυμίζουμε πότε τελειώνουν οι φακοί σου και σου στέλνουμε νέες παραλαβές. Χωρίς spam.'
-            : 'We remind you when your lenses run out and tell you about new arrivals. No spam.'}
+        <p className="relative z-[1] m-0 max-w-[520px] text-[15px]" style={{ color: INK_ON_DARK_FAINT }}>
+          {body}
         </p>
 
         {/* Deliberately a link, not an input: there is no mailing-list backend
             wired up, and a form that silently discards an address is worse
             than no form. */}
         <Link
-          href="/sindesi"
+          href={ctaHref || '/sindesi'}
           className="relative z-[1] mt-2 px-8 py-[15px] text-[14px] font-extrabold tracking-[0.04em] transition-colors hover:bg-[var(--hv)]"
           style={{ background: SURFACE, color: INK, borderRadius: R_PILL, ['--hv' as string]: ACCENT }}
         >
-          {el ? 'Δημιούργησε λογαριασμό' : 'Create an account'}
+          {ctaLabel}
         </Link>
       </div>
     </section>

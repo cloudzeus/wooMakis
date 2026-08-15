@@ -48,6 +48,7 @@ export const NAV_GROUPS: NavGroup[] = [
       { href: '/media',      label: 'Πολυμέσα',     permission: 'media.view' },
       { href: '/content',    label: 'Περιεχόμενο',  permission: 'settings.manage' },
       { href: '/storefront', label: 'Κατάστημα',  permission: 'settings.manage' },
+      { href: '/storefront/sections', label: 'Ενότητες αρχικής', permission: 'settings.manage' },
     ],
   },
   {
