@@ -1,6 +1,7 @@
 'use client'
 
 import Image from 'next/image'
+import Link from 'next/link'
 import { useMemo } from 'react'
 import type { ColumnDef } from '@tanstack/react-table'
 import { DataTable } from '@/components/data-table'
@@ -75,7 +76,9 @@ export function ProductsTable({ rows }: { rows: ProductRow[] }) {
       accessorFn: r => r.nameEl ?? r.nameEn ?? '',
       cell: ({ row }) => (
         <div className="min-w-[220px]">
-          <div className="font-medium">{row.original.nameEl ?? row.original.nameEn}</div>
+          <Link href={`/products/${row.original.id}`} className="font-medium hover:underline">
+            {row.original.nameEl ?? row.original.nameEn}
+          </Link>
           {row.original.nameEn && row.original.nameEl && (
             <div className="text-xs text-muted-foreground">{row.original.nameEn}</div>
           )}

@@ -5,6 +5,11 @@ const nextConfig: NextConfig = {
   // on every start. They were deliberately removed in 2a987ae.
   agentRules: false,
 
+  // Image uploads go through a server action; the 1 MB default rejects photos.
+  experimental: {
+    serverActions: { bodySizeLimit: '16mb' },
+  },
+
   images: {
     remotePatterns: [
       // Mirrored product imagery (Bunny pull zone).
