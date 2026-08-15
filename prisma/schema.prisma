@@ -117,6 +117,7 @@ model Product {
   variations   ProductVariation[]
   categories   ProductCategory[]
   images       ProductImage[]
+  cartLines    CartLine[]
 
   @@index([type])
   @@index([status])
@@ -223,4 +224,54 @@ model SyncLog {
   error      String?
 
   @@index([target, startedAt])
+}
+
+// ── Storefront cart ──────────────────────────────────────
+// Guest-only for now: the storefront has no customer accounts (User is
+// staff-only, see spec §5.3). customerId is reserved so accounts can be added
+// without a migration.
+
+model Cart {
+  id String @id @default(cuid())
+
+  /// Opaque token held in the WOOMAKIS_CART cookie. Separate from the primary
+  /// key so a leaked id cannot be replayed as a session.
+  token String @unique @db.VarChar(64)
+
+  customerId String?
+
+  shippingMethod String? @db.VarChar(32)
+  paymentMethod  String? @db.VarChar(32)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  /// Touched on every read; drives abandoned-cart cleanup.
+  lastSeenAt DateTime @default(now())
+
+  lines CartLine[]
+
+  @@index([lastSeenAt])
+  @@index([customerId])
+}
+
+model CartLine {
+  id     String @id @default(cuid())
+  cartId String
+  cart   Cart   @relation(fields: [cartId], references: [id], onDelete: Cascade)
+
+  productId String
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  quantity Int @default(1)
+
+  /// Price when the line was added. Kept for support questions ("it said 12 €
+  /// yesterday") — never used for display or for computing the total, which
+  /// always re-read the current catalogue price.
+  addedPrice Decimal? @db.Decimal(12, 2)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([cartId, productId])
+  @@index([cartId])
 }
