@@ -2,6 +2,7 @@
 
 import Image from 'next/image'
 import { useRef, useState, useTransition } from 'react'
+import { SLOTS } from '@/lib/storefront-slots'
 import { assignSlot, deleteMedia, updateMedia, uploadMedia } from './actions'
 
 export type LibraryItem = {
@@ -17,11 +18,6 @@ export type LibraryItem = {
   createdAt: string
   durationSeconds: number | null
 }
-
-/** Named positions the storefront reads. Keep in step with the pages that use them. */
-export const SLOTS = [
-  { key: 'editorial-hero', label: 'Εικόνα ενότητας «Καθαρή όραση»' },
-] as const
 
 function human(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`

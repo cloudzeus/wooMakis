@@ -15,7 +15,7 @@ import { NextResponse, type NextRequest } from 'next/server'
  */
 const PROTECTED_PREFIXES = [
   '/dashboard', '/products', '/categories', '/customers',
-  '/media', '/sync', '/users', '/roles', '/settings',
+  '/media', '/sync', '/storefront', '/users', '/roles', '/settings',
 ]
 
 export function proxy(req: NextRequest) {
