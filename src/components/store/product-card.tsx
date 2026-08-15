@@ -1,6 +1,7 @@
 'use client'
 
 import Image from 'next/image'
+import Link from 'next/link'
 import { ICON_SM, WarningCircle } from './icons'
 import { INK, INK_FAINT, INK_MUTED, R_CARD, SURFACE, SURFACE_PRODUCT, TEAL_DEEP } from './tokens'
 import type { StoreProduct } from './types'
@@ -34,8 +35,10 @@ export function ProductCard({
       className="group relative flex h-full flex-col overflow-hidden transition-transform duration-300 ease-out motion-safe:hover:-translate-y-1"
       style={{ background: SURFACE, borderRadius: R_CARD }}
     >
-      <div
-        className="relative aspect-square w-full overflow-hidden"
+      <Link
+        href={`/proionta/${encodeURIComponent(product.slug)}`}
+        aria-label={product.name}
+        className="relative block aspect-square w-full overflow-hidden"
         style={{ background: SURFACE_PRODUCT }}
       >
         {img ? (
@@ -72,25 +75,32 @@ export function ProductCard({
           </span>
         )}
 
-        {/* Focus-visible as well as hover, so keyboard users can reach it. */}
+        {/* Focus-visible as well as hover, so keyboard users can reach it.
+            preventDefault stops the surrounding link firing at the same time. */}
         <button
           type="button"
-          onClick={() => onQuickView(product)}
+          onClick={e => { e.preventDefault(); e.stopPropagation(); onQuickView(product) }}
           className="absolute inset-x-3 bottom-3 h-11 cursor-pointer rounded-full text-[13px] font-semibold opacity-0 transition-opacity duration-200 focus-visible:opacity-100 group-hover:opacity-100 motion-reduce:opacity-100"
           style={{ background: INK, color: SURFACE }}
         >
           Γρήγορη προβολή
         </button>
-      </div>
+      </Link>
 
       <div className="flex flex-1 flex-col p-4 pt-3.5">
         {product.brand && (
-          <p className="text-[10px] font-bold uppercase tracking-[0.14em]" style={{ color: TEAL_DEEP }}>
+          <Link
+            href={`/proionta?brand=${encodeURIComponent(product.brand)}`}
+            className="text-[10px] font-bold uppercase tracking-[0.14em] hover:underline"
+            style={{ color: TEAL_DEEP }}
+          >
             {product.brand}
-          </p>
+          </Link>
         )}
-        <h3 className="mt-1 line-clamp-2 text-[13.5px] font-semibold leading-snug" style={{ color: INK }}>
-          {product.name}
+        <h3 className="mt-1 text-[13.5px] font-semibold leading-snug" style={{ color: INK }}>
+          <Link href={`/proionta/${encodeURIComponent(product.slug)}`} className="line-clamp-2 hover:underline">
+            {product.name}
+          </Link>
         </h3>
 
         <div className="mt-auto flex items-baseline gap-2 pt-3">

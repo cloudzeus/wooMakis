@@ -1,6 +1,7 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { ProductCard } from '@/components/store/product-card'
 import { QuickView } from '@/components/store/quick-view'
 import { CREAM, HAIRLINE, INK, INK_FAINT, INK_MUTED, SURFACE, TEAL } from '@/components/store/tokens'
@@ -15,9 +16,21 @@ export function Catalog({
   categories: Facet[]
   brands: Facet[]
 }) {
+  const router = useRouter()
+  const params = useSearchParams()
+
+  // Filters live in the URL so a brand or category link from the home page
+  // lands on an already-filtered catalogue, and the result is shareable.
+  const cat = params.get('category')
+  const brand = params.get('brand')
   const [query, setQuery] = useState('')
-  const [cat, setCat] = useState<string | null>(null)
-  const [brand, setBrand] = useState<string | null>(null)
+
+  const setParam = useCallback((key: string, value: string | null) => {
+    const next = new URLSearchParams(params.toString())
+    if (value) next.set(key, value)
+    else next.delete(key)
+    router.replace(next.toString() ? `/proionta?${next}` : '/proionta', { scroll: false })
+  }, [params, router])
   const [sort, setSort] = useState<'popular' | 'price-asc' | 'price-desc' | 'name'>('popular')
   const [quick, setQuick] = useState<StoreProduct | null>(null)
 
@@ -41,8 +54,16 @@ export function Catalog({
   const activeFilters = [cat, brand].filter(Boolean).length
 
   function reset() {
-    setCat(null); setBrand(null); setQuery('')
+    setQuery('')
+    router.replace('/proionta', { scroll: false })
   }
+
+  useEffect(() => {
+    if ((cat || brand) && typeof window !== 'undefined' && window.scrollY < 200) {
+      document.getElementById('katalogos')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    }
+    // Only when the incoming filter changes, not on every render.
+  }, [cat, brand])
 
   return (
     <>
@@ -96,9 +117,9 @@ export function Catalog({
         {/* Facets */}
         <aside className="space-y-5 lg:sticky lg:top-[148px] lg:h-fit">
           <Facets id="katigories" title="Κατηγορίες" items={categories} active={cat}
-                  onPick={setCat} />
+                  onPick={v => setParam('category', v)} />
           <Facets id="markes" title="Μάρκες" items={brands} active={brand}
-                  onPick={setBrand} />
+                  onPick={v => setParam('brand', v)} />
         </aside>
 
         {/* Grid */}

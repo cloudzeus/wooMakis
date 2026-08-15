@@ -1,6 +1,7 @@
 'use client'
 
 import Image from 'next/image'
+import Link from 'next/link'
 import { useEffect, useRef, useState, useTransition } from 'react'
 import { addToCart } from '@/app/kalathi/actions'
 import { ICON_MD, ICON_SM, CheckCircle, Minus, Plus, WarningCircle, X, ArrowUpRight } from './icons'
@@ -221,6 +222,15 @@ export function QuickView({ product, onClose }: { product: StoreProduct | null; 
                 {pending ? 'Προσθήκη…' : out ? 'Εξαντλημένο' : 'Προσθήκη στο καλάθι'}
               </button>
             </div>
+
+            <Link
+              href={`/proionta/${encodeURIComponent(product.slug)}`}
+              onClick={onClose}
+              className="mt-4 block rounded-full border py-3 text-center text-[13px] font-semibold"
+              style={{ borderColor: 'rgb(20 24 26 / 14%)', color: INK }}
+            >
+              Πλήρη στοιχεία προϊόντος
+            </Link>
 
             {product.permalink && (
               <a

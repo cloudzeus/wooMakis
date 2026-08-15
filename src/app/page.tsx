@@ -107,6 +107,24 @@ export default async function HomePage() {
   const editorialAsset = slots.get('editorial-hero')
   const trustVisual = slots.get('trust-visual')
 
+  /**
+   * WooCommerce holds two separate brand terms for Optimax and Soleko, because
+   * Polylang never linked their translations. Collapsing by display name is the
+   * honest fix on this side: two entries with the same name ARE one brand, and
+   * the catalogue filters by name anyway. The underlying data still needs
+   * repairing in WP-Admin.
+   */
+  const brandList = [...brands
+    .reduce((m, b) => {
+      const name = pick(b.translations)?.name?.trim()
+      if (!name) return m
+      const prev = m.get(name)
+      m.set(name, { name, count: (prev?.count ?? 0) + b.count })
+      return m
+    }, new Map<string, { name: string; count: number }>())
+    .values()]
+    .sort((a, b) => b.count - a.count)
+
   const hero = products[0]
 
   return (
@@ -140,7 +158,7 @@ export default async function HomePage() {
               </h1>
 
               <p className="mt-7 max-w-md text-[15.5px] leading-[1.65]" style={{ color: INK_MUTED }}>
-                Φακοί επαφής, υγρά φροντίδας και γυαλιά ηλίου από {brands.length} μάρκες.
+                Φακοί επαφής, υγρά φροντίδας και γυαλιά ηλίου από {brandList.length} μάρκες.
                 Γνήσια προϊόντα, γρήγορη αποστολή σε όλη την Ελλάδα.
               </p>
             </div>
@@ -261,7 +279,7 @@ export default async function HomePage() {
               {categories.map(c => (
                 <li key={c.id}>
                   <Link
-                    href="/proionta#katigories"
+                    href={`/proionta?category=${encodeURIComponent(pick(c.translations)?.name ?? '')}`}
                     className="flex items-center justify-between rounded-2xl px-5 py-4 transition-colors"
                     style={{ background: CANVAS }}
                   >
@@ -280,15 +298,15 @@ export default async function HomePage() {
             Μάρκες
           </h2>
           <ul className="flex flex-wrap gap-2">
-            {brands.map(b => (
-              <li key={b.id}>
+            {brandList.map(b => (
+              <li key={b.name}>
                 <Link
-                  href="/proionta#markes"
+                  href={`/proionta?brand=${encodeURIComponent(b.name)}`}
                   className="inline-flex items-center gap-2 rounded-full border px-4 py-2.5 text-[13.5px] transition-colors hover:border-black/40"
                   style={{ borderColor: HAIRLINE, color: INK }}
                 >
-                  {pick(b.translations)?.name ?? ''}
-                  <span className="text-[11px] tabular-nums" style={{ color: '#A9B0B2' }}>{b.count}</span>
+                  {b.name}
+                  <span className="text-[11px] tabular-nums" style={{ color: INK_FAINT }}>{b.count}</span>
                 </Link>
               </li>
             ))}
