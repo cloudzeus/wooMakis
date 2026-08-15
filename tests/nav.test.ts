@@ -66,8 +66,12 @@ describe('proxy coverage', () => {
       .match(/'\/[a-z-]+'/g)!
       .map(s => s.replace(/'/g, ''))
 
+    // Prefix match, not exact membership — that is what the proxy itself does
+    // (`pathname === p || pathname.startsWith(p + '/')`), so /storefront covers
+    // /storefront/sections and the list does not need an entry per sub-page.
     for (const item of NAV_ITEMS) {
-      expect(listed, `${item.href} is in the sidebar but not gated by the proxy`).toContain(item.href)
+      const covered = listed.some(p => item.href === p || item.href.startsWith(`${p}/`))
+      expect(covered, `${item.href} is in the sidebar but not gated by the proxy`).toBe(true)
     }
   })
 })

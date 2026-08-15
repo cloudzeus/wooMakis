@@ -686,3 +686,48 @@ model HomeSectionTranslation {
 
   @@id([sectionId, locale])
 }
+
+// ── Webhook inbox ────────────────────────────────────────
+// WooCommerce retries a webhook it considers failed, and gives up on one that
+// is slow. So the receiver does exactly two things — verify and persist — and
+// returns 200 in a few milliseconds. A separate worker drains this table.
+//
+// Without the inbox, a slow pull inside the request handler turns every
+// product update into a retry storm, and a crash mid-processing loses the
+// event entirely because WooCommerce already had its 200.
+
+enum WebhookStatus {
+  PENDING
+  DONE
+  FAILED
+  /// Verified and stored, but this topic is not one we act on.
+  IGNORED
+}
+
+model WebhookEvent {
+  id String @id @default(cuid())
+
+  /// X-WC-Webhook-Delivery-Id. Unique, and that uniqueness IS the replay
+  /// protection: WooCommerce reuses the id when it retries.
+  deliveryId String @unique
+
+  /// e.g. "product.updated", "order.created".
+  topic    String
+  resource String
+  event    String
+  /// The upstream object id, pulled from the payload for quick lookup.
+  wooId    Int?
+
+  payload Json
+
+  status  WebhookStatus @default(PENDING)
+  attempts Int          @default(0)
+  error   String?
+
+  receivedAt  DateTime  @default(now())
+  processedAt DateTime?
+
+  @@index([status, receivedAt])
+  @@index([topic])
+  @@index([wooId])
+}

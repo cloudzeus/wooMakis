@@ -3,6 +3,7 @@ import { can } from '@/lib/rbac'
 import { requirePermission } from '@/lib/rbac-server'
 import { readGate } from '@/lib/woo/write'
 import { SyncPanel, type SyncJob } from './sync-panel'
+import { WebhookPanel, type WebhookStats } from './webhook-panel'
 
 export const dynamic = 'force-dynamic'
 
@@ -25,7 +26,7 @@ function duration(from: Date, to: Date | null): string {
 export default async function SyncPage() {
   const session = await requirePermission('sync.view')
 
-  const [logs, products, categories, brands, customers, orders, assets] = await Promise.all([
+  const [logs, products, categories, brands, customers, orders, assets, hooks, lastHook] = await Promise.all([
     prisma.syncLog.findMany({ orderBy: { startedAt: 'desc' }, take: 25 }),
     prisma.product.count(),
     prisma.category.count(),
@@ -33,7 +34,31 @@ export default async function SyncPage() {
     prisma.customer.count(),
     prisma.order.count(),
     prisma.mediaAsset.count(),
+    prisma.webhookEvent.groupBy({ by: ['status'], _count: { _all: true } }),
+    prisma.webhookEvent.findMany({
+      orderBy: { receivedAt: 'desc' },
+      take: 8,
+      select: { deliveryId: true, topic: true, status: true, receivedAt: true, error: true },
+    }),
   ])
+
+  const countOf = (status: string) =>
+    hooks.find(h => h.status === status)?._count._all ?? 0
+
+  const webhookStats: WebhookStats = {
+    pending: countOf('PENDING'),
+    done: countOf('DONE'),
+    failed: countOf('FAILED'),
+    ignored: countOf('IGNORED'),
+    lastReceivedAt: lastHook[0]?.receivedAt.toISOString() ?? null,
+    recent: lastHook.map(e => ({
+      deliveryId: e.deliveryId,
+      topic: e.topic,
+      status: e.status,
+      receivedAt: e.receivedAt.toISOString(),
+      error: e.error,
+    })),
+  }
 
   const lastOk = (target: string) =>
     logs.find(l => l.target === target && l.outcome !== 'FAILED')?.startedAt ?? null
@@ -101,6 +126,13 @@ export default async function SyncPage() {
       </div>
 
       <SyncPanel jobs={jobs} canRun={can(session, 'sync.run')} />
+
+      <WebhookPanel
+        stats={webhookStats}
+        endpoint={`${process.env.AUTH_URL ?? ''}/api/webhooks/woocommerce`}
+        configured={!!process.env.WOO_WEBHOOK_SECRET}
+        canRun={can(session, 'sync.run')}
+      />
 
       <section className="space-y-2">
         <h2 className="font-display text-base font-semibold">Ιστορικό</h2>
