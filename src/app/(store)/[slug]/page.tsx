@@ -5,7 +5,9 @@ import { getPage, parseBlocks } from '@/lib/content'
 import { getT } from '@/lib/locale-server'
 import { getCustomerSession } from '@/lib/customer-auth'
 import { StoreFooter, StoreHeader } from '@/components/store/store-header'
-import { CANVAS, HAIRLINE, INK, INK_MUTED, SURFACE } from '@/components/store/tokens'
+import {
+  CANVAS, HAIRLINE, INK, INK_MUTED, SURFACE,
+} from '@/components/store/tokens'
 
 export const dynamic = 'force-dynamic'
 

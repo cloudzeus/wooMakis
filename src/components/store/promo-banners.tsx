@@ -4,7 +4,9 @@ import Image from 'next/image'
 import Link from 'next/link'
 import { ArrowRight, ICON_MD } from './icons'
 import { Reveal } from './reveal'
-import { CREAM, HAIRLINE, INK, INK_MUTED, R_CARD, SURFACE, SURFACE_PRODUCT, TEAL, TEAL_DEEP } from './tokens'
+import {
+  CREAM, HAIRLINE, INK, INK_MUTED, PRIMARY, R_CARD, SURFACE, SURFACE_PRODUCT,
+} from './tokens'
 
 export type BannerCat = {
   name: string
@@ -52,7 +54,7 @@ function LeadBanner({ cat }: { cat: BannerCat }) {
     <Link
       href={href(cat.name)}
       className="group grid items-center gap-10 overflow-hidden p-10 sm:p-14 lg:grid-cols-2"
-      style={{ background: TEAL, borderRadius: R_CARD }}
+      style={{ background: PRIMARY, borderRadius: R_CARD }}
     >
       <div>
         <p className="text-[10.5px] font-bold uppercase tracking-[0.16em]" style={{ color: 'rgb(20 24 26 / 58%)' }}>
@@ -104,7 +106,7 @@ function TileBanner({ cat }: { cat: BannerCat }) {
         style={{ background: SURFACE, borderRadius: R_CARD, border: `1px solid ${HAIRLINE}` }}
       >
         <div>
-          <p className="text-[10px] font-bold uppercase tracking-[0.15em]" style={{ color: TEAL_DEEP }}>
+          <p className="text-[10px] font-bold uppercase tracking-[0.15em]" style={{ color: PRIMARY }}>
             Κατηγορία
           </p>
           <h3

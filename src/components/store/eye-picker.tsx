@@ -4,7 +4,9 @@ import { Fragment, useMemo, useState, useTransition } from 'react'
 import { addLinesToCart } from '@/app/(store)/kalathi/actions'
 import { CheckCircle, ICON_SM, Minus, Plus, WarningCircle } from './icons'
 import { EYE_SHORT, attrLabel, defaultSelections, eyeAttrKey, splitAttributes } from '@/lib/lens-attributes'
-import { CREAM, HAIRLINE, INK, INK_FAINT, INK_MUTED, SURFACE, TEAL, TEAL_DEEP } from './tokens'
+import {
+  CREAM, HAIRLINE, INK, INK_FAINT, INK_MUTED, PRIMARY, SURFACE,
+} from './tokens'
 import type { StoreProduct } from './types'
 
 /**
@@ -105,7 +107,7 @@ export function EyePicker({ product }: { product: StoreProduct }) {
               onChange={e => setPicked(p => ({ ...p, [a.name]: e.target.value }))}
               className="h-12 w-full cursor-pointer rounded-full border px-5 text-[14px] outline-none disabled:cursor-default disabled:opacity-100"
               style={{
-                borderColor: !only && picked[a.name] ? TEAL : HAIRLINE,
+                borderColor: !only && picked[a.name] ? PRIMARY : HAIRLINE,
                 background: only ? CREAM : SURFACE,
                 color: INK,
               }}
@@ -277,7 +279,7 @@ function EyeHead({ label, short }: { label: string; short: string }) {
   return (
     <span className="flex items-baseline gap-1.5 pb-0.5">
       <span className="text-[13px] font-bold" style={{ color: INK }}>{label}</span>
-      <span className="text-[10.5px] font-bold" style={{ color: TEAL_DEEP }}>{short}</span>
+      <span className="text-[10.5px] font-bold" style={{ color: PRIMARY }}>{short}</span>
     </span>
   )
 }
@@ -300,7 +302,7 @@ function EyeSelect({
       // contains spaces, so it cannot serve as an id for aria-labelledby.
       aria-label={`${attrLabel(attr.name)}, ${eye} μάτι`}
       className="h-11 w-full cursor-pointer rounded-full border px-4 text-[14px] tabular-nums outline-none disabled:cursor-not-allowed disabled:opacity-70"
-      style={{ borderColor: value ? TEAL : HAIRLINE, background: SURFACE, color: INK }}
+      style={{ borderColor: value ? PRIMARY : HAIRLINE, background: SURFACE, color: INK }}
     >
       <option value="">Επίλεξε…</option>
       {attr.options.map(o => <option key={o} value={o}>{o}</option>)}

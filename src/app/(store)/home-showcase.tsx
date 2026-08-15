@@ -4,7 +4,9 @@ import Link from 'next/link'
 import { useState } from 'react'
 import { ProductCard } from '@/components/store/product-card'
 import { QuickView } from '@/components/store/quick-view'
-import { INK, INK_MUTED, R_CARD, SURFACE } from '@/components/store/tokens'
+import {
+  INK, INK_MUTED, R_CARD, SURFACE,
+} from '@/components/store/tokens'
 import type { StoreProduct } from '@/components/store/types'
 
 /** Home product strip. Client-side only because quick view needs local state. */

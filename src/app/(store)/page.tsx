@@ -1,64 +1,63 @@
-import Image from 'next/image'
-import Link from 'next/link'
 import { prisma } from '@/lib/prisma'
 import { readCartCount } from '@/lib/cart'
-import { StoreFooter, StoreHeader } from '@/components/store/store-header'
+import { pickTranslation } from '@/lib/i18n'
 import { getT } from '@/lib/locale-server'
 import { getCustomerSession } from '@/lib/customer-auth'
-import { HomeShowcase } from './home-showcase'
-import { HeroMotion } from '@/components/store/hero-motion'
-import { Marquee } from '@/components/store/marquee'
-import { PromoBanners, type BannerCat } from '@/components/store/promo-banners'
-import { EditorialBand } from '@/components/store/editorial-band'
-import { HeroVisual, TrustBand } from '@/components/store/hero-visual'
-import { ArrowRight, ICON_MD, ICON_SM, Sparkle } from '@/components/store/icons'
-import { Reveal } from '@/components/store/reveal'
+import { StoreFooter, StoreHeader } from '@/components/store/store-header'
+import { StoreMotion } from '@/components/store/motion'
+import { ProductTabs, type TabProduct } from '@/components/store/product-tabs'
 import {
-  CANVAS, CREAM, HAIRLINE, INK, INK_FAINT, INK_MUTED,
-  R_CARD, SURFACE, SURFACE_PRODUCT, TEAL, TEAL_DEEP,
-} from '@/components/store/tokens'
-import type { StoreProduct } from '@/components/store/types'
+  BrandMarquee, Categories, Hero, LifestylePanel, Newsletter, TrustStrip,
+  type CategoryTile,
+} from '@/components/store/home-sections'
+import { GUTTER, INK, MAX_W, SURFACE } from '@/components/store/tokens'
 
 export const dynamic = 'force-dynamic'
 
-type WooAttribute = { name?: string; options?: string[] }
+/**
+ * Home page — "Mylens Redesign v3".
+ *
+ * The design ships with a hard-coded catalogue; this reads the real one. Three
+ * things in the design are deliberately NOT reproduced, and each for the same
+ * reason — the shop has no data behind them and inventing it would be a false
+ * claim to a customer:
+ *
+ *  - the flash-sale countdown and VISION20 coupon (no such WooCommerce coupon)
+ *  - "46 sold this week" and the low-stock bar (no such figures exist)
+ *  - the three review quotes and "2.300+ κριτικές" (no reviews are stored)
+ *
+ * Fabricated urgency of that kind is also an unfair commercial practice under
+ * the EU Omnibus Directive, which matters for a shop whose own terms page
+ * cites consumer law. Each is replaced by something true: real availability,
+ * real counts, and a real reason to make an account.
+ */
+
+/** Rough grouping for the product tabs, from the real category names. */
+function groupOf(categories: string[]): string {
+  const joined = categories.join(' ').toLowerCase()
+  if (/υγρ|φροντ|solution|care|σταγόν|drop/.test(joined)) return 'care'
+  if (/φακ|lens/.test(joined)) return 'lens'
+  return 'other'
+}
 
 export default async function HomePage() {
   const { locale } = await getT()
-  const customer = await getCustomerSession()
+  const [customer, cartCount] = await Promise.all([getCustomerSession(), readCartCount()])
 
-  const [rows, categories, productCount, cartCount, brands, slotAssets, bannerRows] = await Promise.all([
+  const [productRows, categoryRows, brandRows, productCount, slots] = await Promise.all([
     prisma.product.findMany({
       where: { status: 'publish', images: { some: {} } },
       orderBy: [{ featured: 'desc' }, { totalSales: 'desc' }],
-      take: 8,
+      take: 12,
       include: {
         translations: true,
-        images: { include: { asset: true }, orderBy: { position: 'asc' } },
+        images: { include: { asset: true }, orderBy: { position: 'asc' }, take: 1 },
         categories: { include: { category: { include: { translations: true } } } },
         brands: { include: { brand: { include: { translations: true } } } },
-        _count: { select: { variations: true } },
       },
     }),
     prisma.category.findMany({
-      orderBy: { count: 'desc' },
-      include: { translations: true, _count: { select: { products: true } } },
-    }),
-    prisma.product.count({ where: { status: 'publish' } }),
-    readCartCount(),
-    prisma.brand.findMany({
       where: { products: { some: {} } },
-      orderBy: { count: 'desc' },
-      take: 16,
-      include: { translations: true },
-    }),
-    // Every assigned storefront slot in one query.
-    prisma.mediaAsset.findMany({
-      where: { slot: { not: null } },
-      select: { slot: true, cdnUrl: true, altText: true },
-    }),
-    // One representative product image per category, for the banner band.
-    prisma.category.findMany({
       orderBy: { count: 'desc' },
       take: 6,
       include: {
@@ -66,258 +65,111 @@ export default async function HomePage() {
         _count: { select: { products: true } },
         products: {
           take: 1,
-          where: { product: { images: { some: {} }, status: 'publish' } },
+          where: { product: { status: 'publish', images: { some: {} } } },
           include: { product: { include: { images: { include: { asset: true }, take: 1 } } } },
         },
       },
     }),
+    prisma.brand.findMany({
+      where: { products: { some: {} } },
+      orderBy: { count: 'desc' },
+      take: 12,
+      include: { translations: true },
+    }),
+    prisma.product.count({ where: { status: 'publish' } }),
+    prisma.mediaAsset.findMany({
+      where: { slot: { not: null } },
+      select: { slot: true, cdnUrl: true, altText: true },
+    }),
   ])
 
-  const pick = <T extends { locale: string }>(t: T[]) => t.find(x => x.locale === 'el') ?? t[0]
+  const slot = (name: string) => {
+    const a = slots.find(s => s.slot === name)
+    return a ? { url: a.cdnUrl, alt: a.altText ?? '' } : null
+  }
 
-  const products: StoreProduct[] = rows.map(p => {
-    const el = pick(p.translations)
-    const en = p.translations.find(t => t.locale === 'en')
-    const attrs = Array.isArray(p.attributes) ? (p.attributes as WooAttribute[]) : []
+  const products: TabProduct[] = productRows.map(p => {
+    const t = pickTranslation(p.translations, locale)
+    const categories = p.categories.map(pc =>
+      pickTranslation(pc.category.translations, locale)?.name ?? '')
     return {
       id: p.id,
-      name: el?.name ?? '',
-      nameEn: en?.name ?? null,
-      slug: el?.slug ?? '',
-      sku: p.sku,
-      brand: p.brands[0] ? pick(p.brands[0].brand.translations)?.name ?? null : null,
-      categories: p.categories.map(pc => pick(pc.category.translations)?.name ?? '').filter(Boolean),
-      price: p.price ? Number(p.price) : null,
-      regularPrice: p.regularPrice ? Number(p.regularPrice) : null,
-      onSale: p.onSale,
-      stockStatus: p.stockStatus,
-      type: p.type,
-      shortDescription: el?.shortDescription ?? null,
-      description: el?.description ?? null,
-      permalink: el?.permalink ?? null,
-      images: p.images.map(pi => ({ url: pi.asset.cdnUrl, alt: pi.alt })),
-      attributes: attrs.filter(a => a.name && a.options?.length).map(a => ({ name: a.name!, options: a.options! })),
-      variationCount: p._count.variations,
+      slug: t?.slug ?? null,
+      name: t?.name ?? '—',
+      brand: pickTranslation(p.brands[0]?.brand.translations ?? [], locale)?.name ?? null,
+      price: p.price?.toString() ?? null,
+      regularPrice: p.regularPrice?.toString() ?? null,
+      image: p.images[0]?.asset.cdnUrl ?? null,
+      group: groupOf(categories),
+      inStock: p.stockStatus === 'instock',
     }
   })
 
-  const bannerCats: BannerCat[] = bannerRows.map(c => ({
-    name: pick(c.translations)?.name ?? '',
-    count: c._count.products,
-    imageUrl: c.products[0]?.product.images[0]?.asset.cdnUrl ?? null,
-  }))
+  const categories: CategoryTile[] = categoryRows.map(c => {
+    const t = pickTranslation(c.translations, locale)
+    const name = t?.name ?? '—'
+    return {
+      name,
+      count: c._count.products,
+      image: c.products[0]?.product.images[0]?.asset.cdnUrl ?? null,
+      href: `/proionta?category=${encodeURIComponent(name)}`,
+    }
+  })
 
-  const slots = new Map(slotAssets.map(a => [a.slot!, a]))
-  const heroVisual = slots.get('hero-visual')
-  const editorialAsset = slots.get('editorial-hero')
-  const trustVisual = slots.get('trust-visual')
-
-  /**
-   * WooCommerce holds two separate brand terms for Optimax and Soleko, because
-   * Polylang never linked their translations. Collapsing by display name is the
-   * honest fix on this side: two entries with the same name ARE one brand, and
-   * the catalogue filters by name anyway. The underlying data still needs
-   * repairing in WP-Admin.
-   */
-  const brandList = [...brands
-    .reduce((m, b) => {
-      const name = pick(b.translations)?.name?.trim()
-      if (!name) return m
-      const prev = m.get(name)
-      m.set(name, { name, count: (prev?.count ?? 0) + b.count })
-      return m
-    }, new Map<string, { name: string; count: number }>())
-    .values()]
-    .sort((a, b) => b.count - a.count)
-
-  const hero = products[0]
+  // Deduped by display name: Polylang never linked some translation groups, so
+  // the same brand can arrive twice under two ids.
+  const brands = [...new Set(
+    brandRows
+      .map(b => pickTranslation(b.translations, locale)?.name)
+      .filter((n): n is string => !!n),
+  )]
 
   return (
-    <div className="min-h-dvh font-store" style={{ background: CANVAS }}>
+    <div className="overflow-x-hidden font-store" style={{ background: SURFACE, color: INK }}>
+      <StoreMotion />
+
       <StoreHeader cartCount={cartCount} locale={locale} customerName={customer?.name} />
 
-      <main className="mx-auto max-w-[1440px] px-5 pb-24 pt-5 sm:px-8">
-        {/* ── Hero bento: 7/5 split, staggered heights for rhythm ── */}
-        <HeroMotion>
-        <section className="grid gap-3 lg:grid-cols-12">
-          <div
-            data-hero="1"
-            className="flex flex-col justify-between p-8 sm:p-11 lg:col-span-7"
-            style={{ background: SURFACE, borderRadius: R_CARD }}
-          >
-            <div>
-              <span
-                className="inline-flex items-center gap-2 rounded-full px-3.5 py-1.5 text-[10.5px] font-bold uppercase tracking-[0.15em]"
-                style={{ background: INK, color: SURFACE }}
-              >
-                <Sparkle size={ICON_SM} weight="fill" />
-                Επίσημος διανομέας
-              </span>
+      <Hero
+        locale={locale}
+        image={slot('hero-visual')}
+        productCount={productCount}
+        brandCount={brands.length}
+      />
 
-              <h1
-                className="mt-8 font-store-display font-black text-[clamp(48px,8.4vw,92px)] uppercase leading-[0.86] tracking-[-0.005em]"
-                style={{ color: INK }}
-              >
-                Δες τη<br />
-                <span style={{ color: TEAL_DEEP }}>διαφορά</span>
-              </h1>
+      <TrustStrip locale={locale} />
 
-              <p className="mt-7 max-w-md text-[15.5px] leading-[1.65]" style={{ color: INK_MUTED }}>
-                Φακοί επαφής, υγρά φροντίδας και γυαλιά ηλίου από {brandList.length} μάρκες.
-                Γνήσια προϊόντα, γρήγορη αποστολή σε όλη την Ελλάδα.
-              </p>
-            </div>
+      <Categories locale={locale} items={categories} />
 
-            <div className="mt-10 flex flex-wrap items-center gap-3">
-              <Link
-                href="/proionta"
-                className="inline-flex items-center gap-2 rounded-full px-8 py-4 text-sm font-bold transition-transform motion-safe:hover:-translate-y-0.5"
-                style={{ background: INK, color: SURFACE }}
-              >
-                Δες όλα τα προϊόντα
-                <ArrowRight size={ICON_MD} weight="bold" />
-              </Link>
-            </div>
-          </div>
+      <ProductTabs locale={locale} products={products} />
 
-          {/* Right column: hero product over stat strip */}
-          <div className="lg:col-span-5">
-            {hero && (
-              <Link
-                href="/proionta"
-                data-hero="2"
-                className="group relative block overflow-hidden"
-                style={{ background: SURFACE_PRODUCT, borderRadius: R_CARD }}
-              >
-                {hero.images[0] && (
-                  <div className="relative aspect-square w-full">
-                    <Image
-                      src={hero.images[0].url}
-                      alt={hero.name}
-                      fill
-                      sizes="(max-width: 1024px) 100vw, 40vw"
-                      priority
-                      className="object-contain p-10 transition-transform duration-700 ease-out motion-safe:group-hover:scale-[1.04]"
-                      unoptimized
-                    />
-                  </div>
-                )}
-                <div className="absolute left-5 top-5">
-                  <span
-                    className="rounded-full px-3 py-1.5 text-[10.5px] font-bold uppercase tracking-[0.13em]"
-                    style={{ background: TEAL, color: INK }}
-                  >
-                    Το πιο δημοφιλές
-                  </span>
-                </div>
-                <div className="px-6 pb-6">
-                  {hero.brand && (
-                    <p className="text-[10.5px] font-bold uppercase tracking-[0.14em]" style={{ color: TEAL_DEEP }}>
-                      {hero.brand}
-                    </p>
-                  )}
-                  <p className="mt-1 text-[17px] font-bold leading-snug" style={{ color: INK }}>{hero.name}</p>
-                  {hero.price !== null && (
-                    <p className="mt-1 text-[15px] font-bold tabular-nums" style={{ color: INK }}>
-                      {hero.price.toFixed(2)} €
-                    </p>
-                  )}
-                </div>
-              </Link>
-            )}
-
-          </div>
-        </section>
-        </HeroMotion>
-
-        <HeroVisual
-          imageUrl={heroVisual?.cdnUrl ?? null}
-          alt={heroVisual?.altText ?? ''}
+      <section
+        className="grid grid-cols-[repeat(auto-fit,minmax(430px,1fr))] gap-6 pb-16 pt-12"
+        style={{ maxWidth: MAX_W, marginInline: 'auto', paddingInline: GUTTER }}
+      >
+        <LifestylePanel
+          image={slot('editorial-hero')}
+          href="/proionta"
+          eyebrow={locale === 'el' ? 'ΚΑΘΑΡΗ ΟΡΑΣΗ, ΚΑΘΕ ΜΕΡΑ' : 'CLEAR VISION, EVERY DAY'}
+          title={locale === 'el'
+            ? 'Ό,τι φοράς στα μάτια σου αξίζει προσοχή'
+            : 'Whatever you wear on your eyes deserves care'}
+          cta={locale === 'el' ? 'Δες τα προϊόντα' : 'Browse products'}
         />
-
-        {/* ── Promo ticker ── */}
-        <Marquee
-          className="mt-3 py-4"
-          speed={34}
-          itemClassName="shrink-0"
-          items={[
-            'Δωρεάν αποστολή άνω των 40 €',
-            'Γνήσια προϊόντα',
-            'Επίσημος διανομέας',
-            'Αποστολή σε 1-3 ημέρες',
-            'Υποστήριξη από οπτικούς',
-            'Ασφαλής πληρωμή',
-          ].map(t => (
-            <span
-              key={t}
-              className="inline-flex items-center gap-3 whitespace-nowrap rounded-full px-6 py-3 text-[13px] font-semibold"
-              style={{ background: SURFACE, color: INK, border: `1px solid ${HAIRLINE}` }}
-            >
-              <span aria-hidden style={{ color: TEAL_DEEP }}>✦</span>
-              {t}
-            </span>
-          ))}
+        <LifestylePanel
+          image={slot('trust-visual')}
+          href="/syxnes-erotiseis"
+          eyebrow={locale === 'el' ? 'ΡΩΤΗΣΕ ΜΑΣ' : 'ASK US'}
+          title={locale === 'el'
+            ? 'Δεν ξέρεις ποιο υγρό ταιριάζει στους φακούς σου;'
+            : 'Not sure which solution suits your lenses?'}
+          cta={locale === 'el' ? 'Συχνές ερωτήσεις' : 'Read the FAQ'}
         />
+      </section>
 
-        {/* ── Category banners ── */}
-        <PromoBanners cats={bannerCats} />
+      <BrandMarquee brands={brands} />
 
-        {/* ── Products ── */}
-        <HomeShowcase products={products} />
-
-        <TrustBand imageUrl={trustVisual?.cdnUrl ?? null} alt={trustVisual?.altText ?? ''} />
-
-        {/* One deliberate dark band. See editorial-band.tsx for why. */}
-        <EditorialBand
-          imageUrl={editorialAsset?.cdnUrl ?? 'https://picsum.photos/seed/mylens-eyewear-portrait/1200/1400'}
-          alt={editorialAsset?.altText ?? 'Φωτογραφία μάρκας'}
-          isPlaceholder={!editorialAsset}
-        />
-
-        {/* Categories */}
-        <Reveal className="mt-3 p-8 sm:p-11" as="section" stagger={0.05}>
-          <div style={{ background: SURFACE, borderRadius: R_CARD }} className="p-8 sm:p-11">
-            <h2 className="mb-7 font-store-display font-black text-[32px] uppercase tracking-[-0.005em]" style={{ color: INK }}>
-              Κατηγορίες
-            </h2>
-            <ul className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-              {categories.map(c => (
-                <li key={c.id}>
-                  <Link
-                    href={`/proionta?category=${encodeURIComponent(pick(c.translations)?.name ?? '')}`}
-                    className="flex items-center justify-between rounded-2xl px-5 py-4 transition-colors"
-                    style={{ background: CANVAS }}
-                  >
-                    <span className="text-[14px]" style={{ color: INK }}>{pick(c.translations)?.name ?? 'Χωρίς όνομα'}</span>
-                    <span className="text-[12px] tabular-nums" style={{ color: INK_FAINT }}>{c._count.products}</span>
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          </div>
-        </Reveal>
-
-        {/* ── Brands ── */}
-        <section className="mt-3 p-8 sm:p-11" style={{ background: SURFACE, borderRadius: R_CARD }}>
-          <h2 className="mb-6 font-store-display font-black text-[32px] uppercase tracking-[-0.005em]" style={{ color: INK }}>
-            Μάρκες
-          </h2>
-          <ul className="flex flex-wrap gap-2">
-            {brandList.map(b => (
-              <li key={b.name}>
-                <Link
-                  href={`/proionta?brand=${encodeURIComponent(b.name)}`}
-                  className="inline-flex items-center gap-2 rounded-full border px-4 py-2.5 text-[13.5px] transition-colors hover:border-black/40"
-                  style={{ borderColor: HAIRLINE, color: INK }}
-                >
-                  {b.name}
-                  <span className="text-[11px] tabular-nums" style={{ color: INK_FAINT }}>{b.count}</span>
-                </Link>
-              </li>
-            ))}
-          </ul>
-        </section>
-      </main>
+      <Newsletter locale={locale} />
 
       <StoreFooter locale={locale} />
     </div>

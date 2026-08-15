@@ -4,7 +4,9 @@ import { getFaq } from '@/lib/content'
 import { getT } from '@/lib/locale-server'
 import { getCustomerSession } from '@/lib/customer-auth'
 import { StoreFooter, StoreHeader } from '@/components/store/store-header'
-import { CANVAS, INK, INK_MUTED } from '@/components/store/tokens'
+import {
+  CANVAS, INK, INK_MUTED,
+} from '@/components/store/tokens'
 import { FaqList } from './faq-list'
 
 export const dynamic = 'force-dynamic'

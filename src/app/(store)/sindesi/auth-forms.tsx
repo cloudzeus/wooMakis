@@ -3,7 +3,9 @@
 import { useRouter } from 'next/navigation'
 import { useState, useTransition } from 'react'
 import { translator, type Locale } from '@/lib/i18n'
-import { HAIRLINE, INK, INK_MUTED, SURFACE, TEAL_DEEP } from '@/components/store/tokens'
+import {
+  HAIRLINE, INK, INK_MUTED, PRIMARY, SURFACE,
+} from '@/components/store/tokens'
 import { lookupOrder, registerCustomer, signInCustomer } from './actions'
 
 type Mode = 'signIn' | 'register'
@@ -177,7 +179,7 @@ function OrderLookup({ locale, onFound }: { locale: Locale; onFound: (id: string
         </button>
       </form>
 
-      <p className="mt-4 text-[12.5px]" style={{ color: TEAL_DEEP }}>
+      <p className="mt-4 text-[12.5px]" style={{ color: PRIMARY }}>
         {locale === 'el'
           ? 'Ο αριθμός παραγγελίας είναι στο email επιβεβαίωσης που έλαβες.'
           : 'The order number is in the confirmation email you received.'}

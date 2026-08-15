@@ -2,7 +2,9 @@
 
 import { useTransition } from 'react'
 import { signOutCustomer } from '@/app/(store)/sindesi/actions'
-import { HAIRLINE, INK, SURFACE } from '@/components/store/tokens'
+import {
+  HAIRLINE, INK, SURFACE,
+} from '@/components/store/tokens'
 
 export function SignOutButton({ label }: { label: string }) {
   const [pending, start] = useTransition()

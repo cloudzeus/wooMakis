@@ -2,7 +2,7 @@ import Image from 'next/image'
 import Link from 'next/link'
 import { ArrowRight, CheckCircle, ICON_MD, ICON_SM, Truck } from './icons'
 import {
-  DARK, DARK_SURFACE, HAIRLINE_ON_DARK, ON_DARK, ON_DARK_MUTED, R_CARD, TEAL,
+  HAIRLINE_ON_DARK, INK, INK_ON_DARK, INK_ON_DARK_FAINT, PRIMARY, R_CARD,
 } from './tokens'
 
 /**
@@ -32,7 +32,7 @@ export function EditorialBand({
   return (
     <section
       className="relative mt-3 grid overflow-hidden lg:grid-cols-2"
-      style={{ background: DARK, borderRadius: R_CARD }}
+      style={{ background: INK, borderRadius: R_CARD }}
     >
       <div className="relative min-h-[320px] lg:min-h-[520px]">
         <Image
@@ -48,13 +48,13 @@ export function EditorialBand({
       <div className="flex flex-col justify-center p-8 sm:p-12 lg:p-16">
         <h2
           className="font-store-display font-black text-[clamp(38px,5.4vw,68px)] uppercase leading-[0.9] tracking-[-0.01em]"
-          style={{ color: ON_DARK }}
+          style={{ color: INK_ON_DARK }}
         >
           Καθαρή όραση,<br />
-          <span style={{ color: TEAL }}>κάθε μέρα</span>
+          <span style={{ color: PRIMARY }}>κάθε μέρα</span>
         </h2>
 
-        <p className="mt-6 max-w-md text-[15px] leading-[1.7]" style={{ color: ON_DARK_MUTED }}>
+        <p className="mt-6 max-w-md text-[15px] leading-[1.7]" style={{ color: INK_ON_DARK_FAINT }}>
           Δουλεύουμε μόνο με επίσημους διανομείς, ώστε ό,τι φοράς στα μάτια σου
           να είναι ακριβώς αυτό που υπόσχεται η συσκευασία.
         </p>
@@ -63,7 +63,7 @@ export function EditorialBand({
           <Link
             href="/proionta"
             className="inline-flex items-center gap-2 rounded-full px-7 py-4 text-sm font-bold transition-transform motion-safe:hover:-translate-y-0.5"
-            style={{ background: TEAL, color: DARK }}
+            style={{ background: PRIMARY, color: INK }}
           >
             Δες όλα τα προϊόντα
             <ArrowRight size={ICON_MD} weight="bold" />

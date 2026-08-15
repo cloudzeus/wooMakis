@@ -1,32 +1,48 @@
-import Image from 'next/image'
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { readCart } from '@/lib/cart'
+import { getT } from '@/lib/locale-server'
+import { getCustomerSession } from '@/lib/customer-auth'
 import { ordersEnabled } from '@/lib/woo/orders'
+import { StoreFooter, StoreHeader } from '@/components/store/store-header'
+import {
+  CANVAS, INK, INK_MUTED,
+} from '@/components/store/tokens'
 import { CheckoutForm } from './checkout-form'
 
 export const dynamic = 'force-dynamic'
 
 export default async function CheckoutPage() {
-  const cart = await readCart('el')
+  const { locale, t } = await getT()
+  const cart = await readCart(locale)
   if (cart.lines.length === 0) redirect('/kalathi')
 
-  return (
-    <div className="min-h-screen bg-white font-store text-[#0f2429]">
-      <header className="border-b border-black/5">
-        <div className="mx-auto flex h-16 max-w-5xl items-center justify-between px-5">
-          <Link href="/">
-            <Image src="/mylens-logo.svg" alt="mylens" width={70} height={40} priority />
-          </Link>
-          <Link href="/kalathi" className="text-sm hover:text-[#00cfc9]">← Πίσω στο καλάθι</Link>
-        </div>
-      </header>
+  const session = await getCustomerSession()
 
-      <main className="mx-auto max-w-5xl px-5 py-12">
-        <h1 className="mb-2 text-3xl font-semibold tracking-tight">Ολοκλήρωση παραγγελίας</h1>
-        <p className="mb-8 text-sm text-[#0f2429]/60">
-          Συμπλήρωσε τα στοιχεία παράδοσης. Στο επόμενο βήμα θα μεταφερθείς στη
-          σελίδα πληρωμής του mylens.gr για να επιλέξεις τρόπο πληρωμής.
+  return (
+    <div className="min-h-screen font-store" style={{ background: CANVAS, color: INK }}>
+      <StoreHeader
+        cartCount={cart.lines.reduce((n, l) => n + l.quantity, 0)}
+        locale={locale}
+        customerName={session?.name}
+      />
+
+      <main className="mx-auto max-w-[1100px] px-5 py-10 sm:px-8">
+        <nav className="mb-6 text-[12.5px]" style={{ color: INK_MUTED }}>
+          <Link href="/" className="hover:text-black">{t('nav.home')}</Link>
+          <span className="mx-1.5">/</span>
+          <Link href="/kalathi" className="hover:text-black">{t('nav.cart')}</Link>
+          <span className="mx-1.5">/</span>
+          <span>{locale === 'el' ? 'Ολοκλήρωση' : 'Checkout'}</span>
+        </nav>
+
+        <h1 className="mb-2 font-store-display text-[32px] font-black leading-[1.05] tracking-[-0.02em] sm:text-[40px]">
+          {locale === 'el' ? 'Ολοκλήρωση παραγγελίας' : 'Checkout'}
+        </h1>
+        <p className="mb-8 max-w-[60ch] text-sm" style={{ color: INK_MUTED }}>
+          {locale === 'el'
+            ? 'Συμπλήρωσε τα στοιχεία παράδοσης. Στο επόμενο βήμα θα μεταφερθείς στη σελίδα πληρωμής του mylens.gr για να επιλέξεις τρόπο πληρωμής.'
+            : 'Fill in your delivery details. Next you will be taken to the mylens.gr payment page to choose how to pay.'}
         </p>
 
         <CheckoutForm
@@ -40,6 +56,8 @@ export default async function CheckoutPage() {
           }}
         />
       </main>
+
+      <StoreFooter locale={locale} />
     </div>
   )
 }

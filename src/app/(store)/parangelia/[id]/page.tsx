@@ -7,7 +7,9 @@ import { sortPrescription } from '@/lib/lens-fields'
 import { getT } from '@/lib/locale-server'
 import { getCustomerSession, hasOrderAccess } from '@/lib/customer-auth'
 import { StoreFooter, StoreHeader } from '@/components/store/store-header'
-import { CANVAS, CREAM, HAIRLINE, INK, INK_MUTED, SURFACE } from '@/components/store/tokens'
+import {
+  CANVAS, CREAM, HAIRLINE, INK, INK_MUTED, SURFACE,
+} from '@/components/store/tokens'
 
 export const dynamic = 'force-dynamic'
 

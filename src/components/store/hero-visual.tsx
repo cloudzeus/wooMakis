@@ -1,5 +1,7 @@
 import Image from 'next/image'
-import { CREAM, INK, R_CARD, TEAL } from './tokens'
+import {
+  CREAM, INK, PRIMARY, R_CARD,
+} from './tokens'
 
 /**
  * Wide photographic band under the hero.
@@ -45,7 +47,7 @@ export function HeroVisual({
           className="font-store-display font-black text-[clamp(20px,3.2vw,44px)] uppercase leading-[0.95] tracking-[-0.01em] text-white"
         >
           Ό,τι φοράς<br />
-          <span style={{ color: TEAL }}>στα μάτια σου</span><br />
+          <span style={{ color: PRIMARY }}>στα μάτια σου</span><br />
           αξίζει προσοχή
         </p>
       </div>
@@ -82,7 +84,7 @@ export function TrustBand({
 
       <div
         className={`flex flex-col justify-center p-8 sm:p-12 ${imageUrl ? 'lg:col-span-7' : 'lg:col-span-12'}`}
-        style={{ background: TEAL, borderRadius: R_CARD }}
+        style={{ background: PRIMARY, borderRadius: R_CARD }}
       >
         <h2
           className="font-store-display font-black text-[clamp(26px,3.6vw,40px)] uppercase leading-[0.94] tracking-[-0.01em]"

@@ -8,10 +8,11 @@
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --font-sans: var(--font-sans);
-  /* Storefront face — Open Sans, full Greek coverage. */
+  /* Storefront face — Inter 400-900, full Greek coverage.
+     One family for body and display: the v3 design sets its headline weight
+     with 800/900 rather than a second face. */
   --font-store: var(--font-store);
-  /* Storefront display face - Anton, carries Greek. */
-  --font-store-display: var(--font-store-display);
+  --font-store-display: var(--font-store);
   --font-mono: var(--font-sans);
   --font-heading: var(--font-display);
   --font-display: var(--font-display);
@@ -205,9 +206,21 @@
     @apply font-sans;
     font-size: 14px;
   }
+  /* Admin headings only. This rule used to be global and leaked the admin's
+     navy --foreground and Comfortaa onto every storefront heading, which made
+     the newsletter title dark navy on black — 1.1:1, invisible. The storefront
+     sets its own colour per section and uses Inter throughout, so it opts out
+     wholesale via the .font-store root every public page carries. */
   h1, h2, h3 {
     font-family: var(--font-display);
     color: var(--foreground);
+  }
+  .font-store h1,
+  .font-store h2,
+  .font-store h3,
+  .font-store h4 {
+    font-family: inherit;
+    color: inherit;
   }
 }
 
@@ -1716,3 +1729,24 @@ input[type='checkbox'] {
   content: attr(data-placeholder);
   opacity: 0.5;
 }
+
+/* Storefront scroll animations (see components/store/motion.tsx).
+   The initial hidden state lives in CSS so nothing flashes at full opacity
+   before GSAP takes over. StoreMotion clears it immediately when the visitor
+   prefers reduced motion. */
+.ht, .ga { opacity: 0; }
+@media (prefers-reduced-motion: reduce) {
+  .ht, .ga { opacity: 1 !important; transform: none !important; }
+  .marquee-track { animation: none !important; }
+}
+
+@keyframes marquee { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+@keyframes ringSpin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+@keyframes pulseDot {
+  0%, 100% { box-shadow: 0 0 0 0 rgb(200 54 52 / 40%); }
+  60%      { box-shadow: 0 0 0 10px rgb(200 54 52 / 0%); }
+}
+.marquee-track { display: flex; width: max-content; animation: marquee 30s linear infinite; }
+.ring-spin { animation: ringSpin 55s linear infinite; }
+.ring-spin-slow { animation: ringSpin 70s linear infinite reverse; }
+.pulse-dot { animation: pulseDot 2s ease-out infinite; }

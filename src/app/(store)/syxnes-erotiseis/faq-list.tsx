@@ -2,7 +2,9 @@
 
 import { useState } from 'react'
 import type { FaqEntry } from '@/lib/content'
-import { HAIRLINE, INK, INK_MUTED, SURFACE } from '@/components/store/tokens'
+import {
+  HAIRLINE, INK, INK_MUTED, SURFACE,
+} from '@/components/store/tokens'
 
 /**
  * FAQ accordion.

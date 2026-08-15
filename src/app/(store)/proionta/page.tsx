@@ -4,7 +4,9 @@ import { readCartCount } from '@/lib/cart'
 import { StoreFooter, StoreHeader } from '@/components/store/store-header'
 import { getT } from '@/lib/locale-server'
 import { getCustomerSession } from '@/lib/customer-auth'
-import { CANVAS, INK, INK_MUTED, TEAL_DEEP } from '@/components/store/tokens'
+import {
+  CANVAS, INK, INK_MUTED, PRIMARY,
+} from '@/components/store/tokens'
 import type { StoreProduct } from '@/components/store/types'
 import { Catalog } from './catalog'
 
@@ -84,7 +86,7 @@ export default async function ProductsPage() {
 
       <main className="mx-auto max-w-[1440px] px-5 pb-24 pt-10 sm:px-8">
         <div className="mb-8">
-          <p className="text-[11px] font-bold uppercase tracking-[0.16em]" style={{ color: TEAL_DEEP }}>
+          <p className="text-[11px] font-bold uppercase tracking-[0.16em]" style={{ color: PRIMARY }}>
             Κατάλογος
           </p>
           <h1 className="mt-2 font-store-display font-black text-[40px] uppercase leading-[0.95] tracking-[-0.01em] sm:text-[56px]" style={{ color: INK }}>

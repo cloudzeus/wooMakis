@@ -3,7 +3,9 @@
 import { useRouter } from 'next/navigation'
 import { useTransition } from 'react'
 import { LOCALES, LOCALE_COOKIE, LOCALE_NAMES, type Locale } from '@/lib/i18n'
-import { HAIRLINE, INK, INK_MUTED, SURFACE } from './tokens'
+import {
+  HAIRLINE, INK, INK_MUTED, SURFACE,
+} from './tokens'
 
 /**
  * Language toggle.

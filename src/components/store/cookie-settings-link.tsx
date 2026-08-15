@@ -2,7 +2,9 @@
 
 import { translator, type Locale } from '@/lib/i18n'
 import { openCookieSettings } from './cookie-consent'
-import { INK_MUTED } from './tokens'
+import {
+  INK_MUTED,
+} from './tokens'
 
 /**
  * Reopens the consent dialog.

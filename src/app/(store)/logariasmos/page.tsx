@@ -7,7 +7,9 @@ import { sortPrescription } from '@/lib/lens-fields'
 import { getT } from '@/lib/locale-server'
 import { getCustomerSession } from '@/lib/customer-auth'
 import { StoreFooter, StoreHeader } from '@/components/store/store-header'
-import { CANVAS, CREAM, HAIRLINE, INK, INK_MUTED, SURFACE, TEAL_DEEP } from '@/components/store/tokens'
+import {
+  CANVAS, CREAM, HAIRLINE, INK, INK_MUTED, PRIMARY, SURFACE,
+} from '@/components/store/tokens'
 import { SignOutButton } from './sign-out-button'
 
 export const dynamic = 'force-dynamic'
@@ -136,7 +138,7 @@ export default async function AccountPage() {
                     <Link
                       href={`/proionta/${l.slug}`}
                       className="mt-3 inline-block text-[13px] underline hover:no-underline"
-                      style={{ color: TEAL_DEEP }}
+                      style={{ color: PRIMARY }}
                     >
                       {t('account.reorder')}
                     </Link>

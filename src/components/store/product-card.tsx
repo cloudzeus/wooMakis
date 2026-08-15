@@ -3,7 +3,9 @@
 import Image from 'next/image'
 import Link from 'next/link'
 import { ICON_SM, WarningCircle } from './icons'
-import { INK, INK_FAINT, INK_MUTED, R_CARD, SURFACE, SURFACE_PRODUCT, TEAL_DEEP } from './tokens'
+import {
+  INK, INK_FAINT, INK_MUTED, PRIMARY, R_CARD, SURFACE, SURFACE_PRODUCT,
+} from './tokens'
 import type { StoreProduct } from './types'
 
 /**
@@ -92,7 +94,7 @@ export function ProductCard({
           <Link
             href={`/proionta?brand=${encodeURIComponent(product.brand)}`}
             className="text-[10px] font-bold uppercase tracking-[0.14em] hover:underline"
-            style={{ color: TEAL_DEEP }}
+            style={{ color: PRIMARY }}
           >
             {product.brand}
           </Link>

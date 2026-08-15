@@ -4,7 +4,9 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { ProductCard } from '@/components/store/product-card'
 import { QuickView } from '@/components/store/quick-view'
-import { CREAM, HAIRLINE, INK, INK_FAINT, INK_MUTED, SURFACE, TEAL } from '@/components/store/tokens'
+import {
+  CREAM, HAIRLINE, INK, INK_FAINT, INK_MUTED, PRIMARY, SURFACE,
+} from '@/components/store/tokens'
 import type { StoreProduct } from '@/components/store/types'
 
 type Facet = { name: string; count: number }
@@ -101,7 +103,7 @@ export function Catalog({
             <button
               onClick={reset}
               className="h-11 cursor-pointer rounded-full px-4 text-sm font-semibold"
-              style={{ background: TEAL, color: INK }}
+              style={{ background: PRIMARY, color: INK }}
             >
               Καθαρισμός ({activeFilters})
             </button>
@@ -177,7 +179,7 @@ function Facets({
                 aria-pressed={on}
                 className="flex w-full cursor-pointer items-center justify-between rounded-xl px-3 py-2 text-left text-[13px] transition-colors"
                 style={on
-                  ? { background: TEAL, color: INK, fontWeight: 700 }
+                  ? { background: PRIMARY, color: INK, fontWeight: 700 }
                   : { color: INK }}
               >
                 <span className="truncate">{f.name}</span>

@@ -12,8 +12,7 @@ import {
   ArrowUpRight, CheckCircle, ICON_MD, ICON_SM, Minus, Plus, Truck, WarningCircle,
 } from '@/components/store/icons'
 import {
-  CREAM, HAIRLINE, INK, INK_FAINT, INK_MUTED, R_CARD, R_INNER,
-  SURFACE, SURFACE_PRODUCT, TEAL, TEAL_DEEP,
+  CREAM, HAIRLINE, INK, INK_FAINT, INK_MUTED, PRIMARY, R_CARD, R_INNER, SURFACE, SURFACE_PRODUCT,
 } from '@/components/store/tokens'
 import type { StoreProduct } from '@/components/store/types'
 import { isEmptyHtml, sanitizeHtml } from '@/lib/sanitize-html'
@@ -99,7 +98,7 @@ export function ProductView({
                     className="relative h-20 w-20 shrink-0 cursor-pointer overflow-hidden rounded-2xl border-2 transition-colors"
                     style={{
                       background: SURFACE_PRODUCT,
-                      borderColor: i === active ? TEAL : HAIRLINE,
+                      borderColor: i === active ? PRIMARY : HAIRLINE,
                     }}
                   >
                     <Image src={im.url} alt="" fill sizes="80px" className="object-contain p-2" unoptimized />
@@ -117,7 +116,7 @@ export function ProductView({
               <Link
                 href={`/proionta?brand=${encodeURIComponent(product.brand)}`}
                 className="text-[11px] font-bold uppercase tracking-[0.15em] hover:underline"
-                style={{ color: TEAL_DEEP }}
+                style={{ color: PRIMARY }}
               >
                 {product.brand}
               </Link>

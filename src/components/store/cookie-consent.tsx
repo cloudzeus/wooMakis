@@ -3,7 +3,9 @@
 import Link from 'next/link'
 import { useEffect, useRef, useState } from 'react'
 import { translator, type Locale } from '@/lib/i18n'
-import { HAIRLINE, INK, INK_MUTED, SURFACE, TEAL_DEEP } from './tokens'
+import {
+  HAIRLINE, INK, INK_MUTED, PRIMARY, SURFACE,
+} from './tokens'
 
 /**
  * Cookie consent.
@@ -197,7 +199,7 @@ export function CookieConsent({ locale }: { locale: Locale }) {
           <Link
             href="/cookies"
             className="underline hover:no-underline"
-            style={{ color: TEAL_DEEP }}
+            style={{ color: PRIMARY }}
           >
             {t('cookies.more')}
           </Link>

@@ -6,7 +6,9 @@ import { readCartCount } from '@/lib/cart'
 import { StoreFooter, StoreHeader } from '@/components/store/store-header'
 import { getT } from '@/lib/locale-server'
 import { getCustomerSession } from '@/lib/customer-auth'
-import { CANVAS, INK, INK_MUTED, TEAL_DEEP } from '@/components/store/tokens'
+import {
+  CANVAS, INK, INK_MUTED, PRIMARY,
+} from '@/components/store/tokens'
 import type { StoreProduct } from '@/components/store/types'
 import { ProductView } from './product-view'
 
@@ -150,7 +152,7 @@ export default async function ProductPage({ params }: { params: Promise<{ slug: 
               <span aria-hidden style={{ color: INK_MUTED }}>/</span>
               <Link
                 href={`/proionta?category=${encodeURIComponent(product.categories[0])}`}
-                style={{ color: TEAL_DEEP }}
+                style={{ color: PRIMARY }}
                 className="hover:underline"
               >
                 {product.categories[0]}

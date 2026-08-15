@@ -5,7 +5,9 @@ import Link from 'next/link'
 import { useEffect, useRef, useState, useTransition } from 'react'
 import { addToCart } from '@/app/(store)/kalathi/actions'
 import { ICON_MD, ICON_SM, CheckCircle, Minus, Plus, WarningCircle, X, ArrowUpRight } from './icons'
-import { CREAM, INK, INK_FAINT, INK_MUTED, R_CARD, R_INNER, SURFACE, SURFACE_PRODUCT, TEAL, TEAL_DEEP } from './tokens'
+import {
+  CREAM, INK, INK_FAINT, INK_MUTED, PRIMARY, R_CARD, R_INNER, SURFACE, SURFACE_PRODUCT,
+} from './tokens'
 import type { StoreProduct } from './types'
 
 /** Strips WooCommerce markup so descriptions read as plain text in the panel. */
@@ -107,7 +109,7 @@ export function QuickView({ product, onClose }: { product: StoreProduct | null; 
                       className="relative h-16 w-16 shrink-0 cursor-pointer overflow-hidden rounded-xl border-2 transition-colors"
                       style={{
                         background: SURFACE_PRODUCT,
-                        borderColor: i === active ? TEAL : 'rgb(11 15 16 / 10%)',
+                        borderColor: i === active ? PRIMARY : 'rgb(11 15 16 / 10%)',
                       }}
                     >
                       <Image src={im.url} alt="" fill sizes="64px" className="object-contain p-1.5" unoptimized />
@@ -121,7 +123,7 @@ export function QuickView({ product, onClose }: { product: StoreProduct | null; 
           {/* Detail */}
           <div className="flex flex-col p-5 sm:p-7 sm:pl-0">
             {product.brand && (
-              <p className="text-[11px] font-bold uppercase tracking-[0.14em]" style={{ color: TEAL_DEEP }}>
+              <p className="text-[11px] font-bold uppercase tracking-[0.14em]" style={{ color: PRIMARY }}>
                 {product.brand}
               </p>
             )}
