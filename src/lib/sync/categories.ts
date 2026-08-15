@@ -1,6 +1,6 @@
 import { prisma } from '@/lib/prisma'
 import { listCategories } from '@/lib/woo/client'
-import { groupByTranslation } from '@/lib/woo/translation-groups'
+import { decodeEntities, groupByTranslation } from '@/lib/woo/translation-groups'
 import type { WooCategory } from '@/lib/woo/types'
 
 export type CategoryTranslationUpsert = {
@@ -46,7 +46,7 @@ export function toCategoryUpserts(posts: WooCategory[]): CategoryUpsert[] {
       translations: Object.entries(g.byLocale).map(([locale, post]) => ({
         locale,
         wooId: post.id,
-        name: post.name,
+        name: decodeEntities(post.name),
         slug: post.slug,
         description: post.description || null,
         wooSnapshot: post,

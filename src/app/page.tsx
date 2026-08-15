@@ -1,6 +1,8 @@
 import Image from 'next/image'
 import Link from 'next/link'
 import { prisma } from '@/lib/prisma'
+import { readCartCount } from '@/lib/cart'
+import { AddToCart } from '@/components/add-to-cart'
 
 export const dynamic = 'force-dynamic'
 
@@ -13,21 +15,30 @@ export const dynamic = 'force-dynamic'
  * carrying the page.
  */
 export default async function HomePage() {
-  const [featured, categories, productCount] = await Promise.all([
+  const [featured, categories, productCount, cartCount, brands] = await Promise.all([
     prisma.product.findMany({
       where: { status: 'publish', images: { some: {} } },
       orderBy: [{ featured: 'desc' }, { totalSales: 'desc' }],
       take: 8,
       include: {
-        translations: { where: { locale: 'el' } },
+        translations: true,
         images: { include: { asset: true }, orderBy: { position: 'asc' }, take: 1 },
       },
     }),
     prisma.category.findMany({
       orderBy: { menuOrder: 'asc' },
-      include: { translations: { where: { locale: 'el' } }, _count: { select: { products: true } } },
+      include: { translations: true, _count: { select: { products: true } } },
     }),
     prisma.product.count({ where: { status: 'publish' } }),
+    readCartCount(),
+    prisma.brand.findMany({
+      where: { products: { some: {} } },
+      orderBy: { count: 'desc' },
+      take: 12,
+      // All locales, not just el: two brands have no Greek translation and
+      // would otherwise render as a dash.
+      include: { translations: true },
+    }),
   ])
 
   return (
@@ -37,7 +48,16 @@ export default async function HomePage() {
           <Image src="/mylens-logo.svg" alt="mylens" width={70} height={40} priority />
           <nav className="flex items-center gap-6 text-sm">
             <Link href="#katigories" className="hover:text-[#00cfc9]">Κατηγορίες</Link>
+            <Link href="#markes" className="hover:text-[#00cfc9]">Μάρκες</Link>
             <Link href="#proionta" className="hover:text-[#00cfc9]">Προϊόντα</Link>
+            <Link href="/kalathi" className="relative hover:text-[#00cfc9]">
+              Καλάθι
+              {cartCount > 0 && (
+                <span className="ml-1 rounded-full bg-[#00cfc9] px-1.5 py-0.5 text-[11px] text-white tabular-nums">
+                  {cartCount}
+                </span>
+              )}
+            </Link>
             <Link
               href="/login"
               className="rounded-full bg-[#0f2429] px-4 py-2 text-white transition-colors hover:bg-[#00cfc9]"
@@ -90,7 +110,9 @@ export default async function HomePage() {
           {categories.map(c => (
             <li key={c.id}>
               <div className="group flex items-center justify-between rounded-2xl border border-black/8 px-5 py-4 transition-colors hover:border-[#00cfc9]">
-                <span className="font-medium">{c.translations[0]?.name ?? '—'}</span>
+                <span className="font-medium">
+                  {c.translations.find(t => t.locale === 'el')?.name ?? c.translations[0]?.name ?? '—'}
+                </span>
                 <span className="text-sm text-[#0f2429]/50 group-hover:text-[#00cfc9]">
                   {c._count.products}
                 </span>
@@ -100,11 +122,25 @@ export default async function HomePage() {
         </ul>
       </section>
 
+      <section id="markes" className="mx-auto max-w-6xl px-5 pb-20">
+        <h2 className="mb-6 text-2xl font-semibold tracking-tight">Μάρκες</h2>
+        <ul className="flex flex-wrap gap-2">
+          {brands.map(b => (
+            <li key={b.id}>
+              <span className="inline-flex items-center gap-2 rounded-full border border-black/8 px-4 py-2 text-sm transition-colors hover:border-[#00cfc9]">
+                {b.translations.find(t => t.locale === 'el')?.name ?? b.translations[0]?.name ?? '—'}
+                <span className="text-xs text-[#0f2429]/40 tabular-nums">{b.count}</span>
+              </span>
+            </li>
+          ))}
+        </ul>
+      </section>
+
       <section id="proionta" className="mx-auto max-w-6xl px-5 pb-24">
         <h2 className="mb-6 text-2xl font-semibold tracking-tight">Δημοφιλή προϊόντα</h2>
         <ul className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
           {featured.map(p => {
-            const t = p.translations[0]
+            const t = p.translations.find(x => x.locale === 'el') ?? p.translations[0]
             const img = p.images[0]?.asset
             return (
               <li key={p.id} className="group">
@@ -131,16 +167,7 @@ export default async function HomePage() {
                     </span>
                   )}
                 </p>
-                {t?.permalink && (
-                  <a
-                    href={t.permalink}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="mt-2 inline-block text-xs text-[#00cfc9] hover:underline"
-                  >
-                    Αγορά ↗
-                  </a>
-                )}
+                <AddToCart productId={p.id} disabled={p.stockStatus !== 'instock'} />
               </li>
             )
           })}

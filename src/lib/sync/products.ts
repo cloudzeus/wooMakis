@@ -1,6 +1,6 @@
 import { prisma } from '@/lib/prisma'
 import { listProducts, listVariations } from '@/lib/woo/client'
-import { groupByTranslation } from '@/lib/woo/translation-groups'
+import { decodeEntities, groupByTranslation } from '@/lib/woo/translation-groups'
 import type { WooImage, WooProduct, WooProductAttribute } from '@/lib/woo/types'
 
 /**
@@ -101,7 +101,7 @@ export function toProductUpserts(posts: WooProduct[]): ProductUpsert[] {
       translations: locales.map(([locale, post]) => ({
         locale,
         wooId: post.id,
-        name: post.name,
+        name: decodeEntities(post.name),
         slug: post.slug,
         description: post.description || null,
         shortDescription: post.short_description || null,

@@ -36,3 +36,20 @@ export function groupByTranslation<T extends TranslatablePost>(posts: T[]): Tran
 
   return [...groups.values()].sort((a, b) => a.groupKey - b.groupKey)
 }
+
+/**
+ * WooCommerce returns post titles HTML-escaped — "Bausch &amp; Lomb", not
+ * "Bausch & Lomb". Decoding at sync time means every consumer (admin table,
+ * storefront, DeepSeek prompt, order line) gets the real name without each
+ * having to remember.
+ */
+const ENTITIES: Record<string, string> = {
+  '&amp;': '&', '&lt;': '<', '&gt;': '>', '&quot;': '"',
+  '&#039;': "'", '&#39;': "'", '&apos;': "'", '&nbsp;': ' ',
+}
+
+export function decodeEntities(input: string): string {
+  return input
+    .replace(/&(?:amp|lt|gt|quot|#0?39|apos|nbsp);/g, m => ENTITIES[m] ?? m)
+    .replace(/&#(\d+);/g, (_, code) => String.fromCharCode(Number(code)))
+}
