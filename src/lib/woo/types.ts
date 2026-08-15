@@ -45,7 +45,8 @@ export type WooProduct = {
   attributes: unknown[]
   variations: number[]
   menu_order: number
-  total_sales: number
+  /** The live site returns this as a string ("0") for some posts, a number for others. */
+  total_sales: number | string
   date_created: string
   date_modified: string
 }

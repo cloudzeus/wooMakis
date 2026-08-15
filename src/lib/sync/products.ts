@@ -1,0 +1,174 @@
+import { prisma } from '@/lib/prisma'
+import { listProducts } from '@/lib/woo/client'
+import { groupByTranslation } from '@/lib/woo/translation-groups'
+import type { WooImage, WooProduct } from '@/lib/woo/types'
+
+/**
+ * Woo's `sale_price` and `on_sale` cannot be read — requesting either returns
+ * HTTP 500 from the source site (spec §2.1). Sale state is inferred instead.
+ */
+export function deriveOnSale(price: string, regularPrice: string): boolean {
+  const p = Number.parseFloat(price)
+  const r = Number.parseFloat(regularPrice)
+  if (!Number.isFinite(p) || !Number.isFinite(r)) return false
+  return p < r
+}
+
+/**
+ * Woo is inconsistent about numeric scalars — `total_sales` arrives as the string
+ * "0" on some posts and as a number on others, which Postgres rejects for an Int
+ * column. Coerce rather than trusting the declared type.
+ */
+function toInt(value: number | string | null | undefined): number {
+  const n = typeof value === 'number' ? value : Number.parseInt(String(value ?? ''), 10)
+  return Number.isFinite(n) ? n : 0
+}
+
+export type ProductTranslationUpsert = {
+  locale: string
+  wooId: number
+  name: string
+  slug: string
+  description: string | null
+  shortDescription: string | null
+  permalink: string | null
+  wooModifiedAt: Date | null
+  wooSnapshot: WooProduct
+}
+
+export type ProductUpsert = {
+  wooGroupKey: number
+  sku: string | null
+  type: string
+  status: string
+  featured: boolean
+  price: string | null
+  regularPrice: string | null
+  onSale: boolean
+  manageStock: boolean
+  stockQuantity: number | null
+  stockStatus: string
+  menuOrder: number
+  totalSales: number
+  categoryWooIds: number[]
+  images: WooImage[]
+  variationWooIds: number[]
+  translations: ProductTranslationUpsert[]
+}
+
+/** Pure: Woo posts → one upsert per logical product. */
+export function toProductUpserts(posts: WooProduct[]): ProductUpsert[] {
+  return groupByTranslation(posts).map(g => {
+    const locales = Object.entries(g.byLocale)
+    // Language-neutral fields are identical across translations; prefer Greek
+    // as the canonical source, falling back to whatever locale exists.
+    const canonical = g.byLocale.el ?? locales[0][1]
+
+    const images: WooImage[] = []
+    const seenSrc = new Set<string>()
+    for (const [, post] of locales) {
+      for (const img of post.images ?? []) {
+        if (!seenSrc.has(img.src)) { seenSrc.add(img.src); images.push(img) }
+      }
+    }
+
+    const categoryWooIds = [...new Set(locales.flatMap(([, p]) => (p.categories ?? []).map(c => c.id)))]
+    const variationWooIds = [...new Set(locales.flatMap(([, p]) => p.variations ?? []))]
+
+    return {
+      wooGroupKey: g.groupKey,
+      sku: canonical.sku || null,
+      type: canonical.type,
+      status: canonical.status,
+      featured: canonical.featured,
+      price: canonical.price || null,
+      regularPrice: canonical.regular_price || null,
+      onSale: deriveOnSale(canonical.price, canonical.regular_price),
+      manageStock: canonical.manage_stock,
+      stockQuantity: canonical.stock_quantity == null ? null : toInt(canonical.stock_quantity),
+      stockStatus: canonical.stock_status,
+      menuOrder: toInt(canonical.menu_order),
+      totalSales: toInt(canonical.total_sales),
+      categoryWooIds,
+      images,
+      variationWooIds,
+      translations: locales.map(([locale, post]) => ({
+        locale,
+        wooId: post.id,
+        name: post.name,
+        slug: post.slug,
+        description: post.description || null,
+        shortDescription: post.short_description || null,
+        permalink: post.permalink || null,
+        wooModifiedAt: post.date_modified ? new Date(post.date_modified) : null,
+        wooSnapshot: post,
+      })),
+    }
+  })
+}
+
+export type ProductPullResult = { created: number; updated: number; imageUrls: string[] }
+
+export async function pullProducts(): Promise<ProductPullResult> {
+  const posts = await listProducts()
+  const upserts = toProductUpserts(posts)
+  let created = 0
+  let updated = 0
+  const imageUrls: string[] = []
+
+  for (const row of upserts) {
+    const existing = await prisma.product.findUnique({ where: { wooGroupKey: row.wooGroupKey } })
+    const product = await prisma.product.upsert({
+      where: { wooGroupKey: row.wooGroupKey },
+      update: {
+        sku: row.sku, type: row.type, status: row.status, featured: row.featured,
+        price: row.price, regularPrice: row.regularPrice, onSale: row.onSale,
+        manageStock: row.manageStock, stockQuantity: row.stockQuantity,
+        stockStatus: row.stockStatus, menuOrder: row.menuOrder, totalSales: row.totalSales,
+      },
+      create: {
+        wooGroupKey: row.wooGroupKey,
+        sku: row.sku, type: row.type, status: row.status, featured: row.featured,
+        price: row.price, regularPrice: row.regularPrice, onSale: row.onSale,
+        manageStock: row.manageStock, stockQuantity: row.stockQuantity,
+        stockStatus: row.stockStatus, menuOrder: row.menuOrder, totalSales: row.totalSales,
+      },
+    })
+    if (existing) updated++
+    else created++
+
+    for (const t of row.translations) {
+      await prisma.productTranslation.upsert({
+        where: { productId_locale: { productId: product.id, locale: t.locale } },
+        update: {
+          wooId: t.wooId, name: t.name, slug: t.slug, description: t.description,
+          shortDescription: t.shortDescription, permalink: t.permalink,
+          wooModifiedAt: t.wooModifiedAt, wooSnapshot: t.wooSnapshot as object,
+        },
+        create: {
+          productId: product.id, locale: t.locale, wooId: t.wooId,
+          name: t.name, slug: t.slug, description: t.description,
+          shortDescription: t.shortDescription, permalink: t.permalink,
+          wooModifiedAt: t.wooModifiedAt, wooSnapshot: t.wooSnapshot as object,
+        },
+      })
+    }
+
+    // Category links — replace wholesale, the set is small.
+    const categories = await prisma.category.findMany({
+      where: { translations: { some: { wooId: { in: row.categoryWooIds } } } },
+      select: { id: true },
+    })
+    await prisma.productCategory.deleteMany({ where: { productId: product.id } })
+    if (categories.length) {
+      await prisma.productCategory.createMany({
+        data: categories.map(c => ({ productId: product.id, categoryId: c.id })),
+        skipDuplicates: true,
+      })
+    }
+
+    imageUrls.push(...row.images.map(i => i.src))
+  }
+
+  return { created, updated, imageUrls: [...new Set(imageUrls)] }
+}
