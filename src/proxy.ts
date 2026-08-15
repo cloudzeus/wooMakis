@@ -13,8 +13,12 @@ import { NextResponse, type NextRequest } from 'next/server'
  * it drags Prisma/pg into the request path — unavailable on the edge runtime
  * (`node:util/types` missing), and a per-request DB query when pinned to Node.
  */
+// Must list every admin route. A missing entry does not open a hole — the
+// layout still calls auth() — but it costs a signed-out visitor a full render
+// before the redirect, so the test below asserts this stays in step with the
+// navigation.
 const PROTECTED_PREFIXES = [
-  '/dashboard', '/products', '/categories', '/customers',
+  '/dashboard', '/products', '/categories', '/brands', '/orders', '/customers',
   '/media', '/sync', '/storefront', '/users', '/roles', '/settings',
 ]
 

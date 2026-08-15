@@ -149,3 +149,21 @@ export function lensFieldOrder(attributeName: string): number {
   const field = lensFieldFor(attributeName)
   return field ? LENS_FIELDS.indexOf(field) : LENS_FIELDS.length
 }
+
+/**
+ * Sorts prescription pairs into the clinical order used everywhere else —
+ * Βαθμός, Καμπυλότητα, Κύλινδρος, Διάμετρος, Άξονας — with the right eye
+ * before the left.
+ *
+ * Order meta arrives as a plain object, and object key order is whatever the
+ * plugin happened to write, so without this an order reads in a different
+ * sequence from the form that produced it.
+ */
+export function sortPrescription(meta: Record<string, string>): [string, string][] {
+  const rank = (key: string) => {
+    const eye = key.endsWith(' OS') ? 1 : 0
+    const bare = key.replace(/\s+(OD|OS)$/, '')
+    return eye * 100 + lensFieldOrder(bare)
+  }
+  return Object.entries(meta).sort(([a], [b]) => rank(a) - rank(b) || a.localeCompare(b, 'el'))
+}

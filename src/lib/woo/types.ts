@@ -114,14 +114,41 @@ export type WooCustomer = {
   date_modified?: string
 }
 
+export type WooOrderLine = {
+  id: number
+  name?: string
+  sku?: string
+  product_id?: number
+  variation_id?: number
+  quantity?: number
+  subtotal?: string
+  total?: string
+  /**
+   * The prescription. This shop models lens power as a plain attribute rather
+   * than a variation, so the customer's choice lives here and nowhere else.
+   * Keys prefixed with "_" are WooCommerce internals and are dropped on pull.
+   */
+  meta_data?: { key: string; display_key?: string; value: unknown; display_value?: unknown }[]
+}
+
 export type WooOrder = {
   id: number
   number?: string
   status?: string
   currency?: string
   total?: string
+  total_tax?: string
+  shipping_total?: string
+  discount_total?: string
+  payment_method?: string
+  payment_method_title?: string
+  transaction_id?: string
   customer_id?: number
+  customer_note?: string
   billing?: WooAddress
+  shipping?: WooAddress
+  line_items?: WooOrderLine[]
+  date_paid?: string | null
   date_created?: string
   date_modified?: string
 }

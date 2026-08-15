@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import { prisma } from '@/lib/prisma'
 import { requirePermission } from '@/lib/rbac-server'
+import { RowActions } from '@/components/admin/row-actions'
 
 export const dynamic = 'force-dynamic'
 
@@ -45,6 +46,7 @@ export default async function BrandsPage() {
               <th className="px-4 py-3">Γλώσσες</th>
               <th className="px-4 py-3 text-right">Προϊόντα</th>
               <th className="px-4 py-3 text-right">Woo group</th>
+              <th className="w-12 px-4 py-3" />
             </tr>
           </thead>
           <tbody>
@@ -74,6 +76,30 @@ export default async function BrandsPage() {
                 </td>
                 <td className="px-4 py-3 text-right tabular-nums">{r.products}</td>
                 <td className="px-4 py-3 text-right tabular-nums text-muted-foreground">#{r.wooGroupKey}</td>
+                <td className="px-4 py-3">
+                  <div className="flex justify-end">
+                    <RowActions
+                      label={`Ενέργειες για τη μάρκα ${r.name}`}
+                      actions={[
+                        { label: 'Επεξεργασία', href: `/brands/${r.id}` },
+                        {
+                          label: 'Μετάφραση με DeepSeek',
+                          href: `/brands/${r.id}`,
+                          hint: r.locales.length < 2
+                            ? 'Χρειάζεται δεύτερη γλώσσα συνδεδεμένη στο Polylang'
+                            : 'Η μετάφραση γίνεται από τη σελίδα επεξεργασίας',
+                          disabled: r.locales.length < 2,
+                        },
+                        {
+                          label: `Προϊόντα (${r.products})`,
+                          href: `/proionta?brand=${encodeURIComponent(r.name)}`,
+                          disabled: r.products === 0,
+                          hint: r.products === 0 ? 'Δεν έχει προϊόντα' : undefined,
+                        },
+                      ]}
+                    />
+                  </div>
+                </td>
               </tr>
             ))}
           </tbody>

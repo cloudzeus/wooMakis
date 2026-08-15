@@ -43,7 +43,7 @@ export default async function CustomersPage() {
         </p>
       </header>
 
-      <CustomersTable rows={rows} />
+      <CustomersTable rows={rows} wooBaseUrl={process.env.WOO_BASE_URL?.replace(/\/+$/, '') ?? null} />
     </section>
   )
 }

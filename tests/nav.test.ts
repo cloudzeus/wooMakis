@@ -3,6 +3,7 @@ import type { Session } from 'next-auth'
 import { NAV_ITEMS } from '@/lib/nav'
 import { can } from '@/lib/rbac'
 import { ROLE_DEFAULTS, PERMISSIONS } from '@/lib/permissions'
+import { readFile } from 'node:fs/promises'
 
 /**
  * The sidebar filters itself by permission in (admin)/layout.tsx. These assert
@@ -36,7 +37,7 @@ describe('nav permission filtering', () => {
 
   it('gives VIEWER only read-only screens', () => {
     expect(visibleTo('VIEWER').sort()).toEqual(
-      ['/brands', '/categories', '/customers', '/dashboard', '/media', '/products', '/sync'].sort(),
+      ['/brands', '/categories', '/customers', '/dashboard', '/media', '/orders', '/products', '/sync'].sort(),
     )
   })
 
@@ -51,6 +52,22 @@ describe('nav permission filtering', () => {
     const known = new Set(PERMISSIONS.map(p => p.key))
     for (const item of NAV_ITEMS) {
       expect(known.has(item.permission), `${item.href} → unknown ${item.permission}`).toBe(true)
+    }
+  })
+})
+
+describe('proxy coverage', () => {
+  it('protects every navigation target', async () => {
+    // Both lists are edited by hand, and they drifted once already: /sync,
+    // /roles and /settings sat in the sidebar while the pages did not exist.
+    const source = await readFile(new URL('../src/proxy.ts', import.meta.url), 'utf8')
+    const listed = source
+      .slice(source.indexOf('PROTECTED_PREFIXES = ['), source.indexOf(']', source.indexOf('PROTECTED_PREFIXES = [')))
+      .match(/'\/[a-z-]+'/g)!
+      .map(s => s.replace(/'/g, ''))
+
+    for (const item of NAV_ITEMS) {
+      expect(listed, `${item.href} is in the sidebar but not gated by the proxy`).toContain(item.href)
     }
   })
 })

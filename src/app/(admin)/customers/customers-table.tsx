@@ -1,8 +1,10 @@
 'use client'
 
+import Link from 'next/link'
 import { useMemo } from 'react'
 import type { ColumnDef } from '@tanstack/react-table'
 import { DataTable } from '@/components/data-table'
+import { RowActions } from '@/components/admin/row-actions'
 
 export type CustomerRow = {
   id: string
@@ -43,7 +45,7 @@ function fmtDate(iso: string | null): string {
   return Number.isNaN(d.getTime()) ? '—' : d.toLocaleDateString('el-GR')
 }
 
-export function CustomersTable({ rows }: { rows: CustomerRow[] }) {
+export function CustomersTable({ rows, wooBaseUrl }: { rows: CustomerRow[]; wooBaseUrl: string | null }) {
   const columns = useMemo<ColumnDef<CustomerRow, unknown>[]>(() => [
     {
       id: 'name',
@@ -51,7 +53,9 @@ export function CustomersTable({ rows }: { rows: CustomerRow[] }) {
       accessorFn: r => r.name,
       cell: ({ row }) => (
         <div className="min-w-[180px]">
-          <div className="font-medium">{row.original.name}</div>
+          <Link href={`/customers/${row.original.id}`} className="font-medium hover:underline">
+            {row.original.name}
+          </Link>
           {row.original.company && (
             <div className="text-xs text-muted-foreground">{row.original.company}</div>
           )}
@@ -99,7 +103,46 @@ export function CustomersTable({ rows }: { rows: CustomerRow[] }) {
       accessorFn: r => r.lastOrderAt ?? '',
       cell: ({ row }) => <span className="tabular-nums">{fmtDate(row.original.lastOrderAt)}</span>,
     },
-  ], [])
+    {
+      id: 'actions',
+      header: '',
+      enableSorting: false,
+      cell: ({ row }) => {
+        const c = row.original
+        return (
+          <div className="flex justify-end">
+            <RowActions
+              label={`Ενέργειες για ${c.name}`}
+              actions={[
+                { label: 'Καρτέλα πελάτη', href: `/customers/${c.id}` },
+                {
+                  label: `Παραγγελίες (${c.orderCount})`,
+                  href: c.email ? `/orders?q=${encodeURIComponent(c.email)}` : `/customers/${c.id}`,
+                  disabled: c.orderCount === 0,
+                  hint: c.orderCount === 0 ? 'Δεν έχει παραγγελίες' : undefined,
+                },
+                {
+                  label: 'Αποστολή email',
+                  href: c.email ? `mailto:${c.email}` : undefined,
+                  disabled: !c.email,
+                  hint: c.email ? undefined : 'Δεν έχει καταχωρημένο email',
+                },
+                {
+                  label: 'Άνοιγμα στο WooCommerce',
+                  href: c.wooCustomerId
+                    ? `${wooBaseUrl ?? ''}/wp-admin/user-edit.php?user_id=${c.wooCustomerId}`
+                    : undefined,
+                  external: true,
+                  disabled: !c.wooCustomerId || !wooBaseUrl,
+                  hint: c.wooCustomerId ? undefined : 'Επισκέπτης — δεν έχει λογαριασμό',
+                },
+              ]}
+            />
+          </div>
+        )
+      },
+    },
+  ], [wooBaseUrl])
 
   return (
     <DataTable

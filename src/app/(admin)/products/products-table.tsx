@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { useMemo } from 'react'
 import type { ColumnDef } from '@tanstack/react-table'
 import { DataTable } from '@/components/data-table'
+import { RowActions } from '@/components/admin/row-actions'
 
 export type ProductTranslationDetail = {
   locale: string
@@ -160,6 +161,42 @@ export function ProductsTable({ rows }: { rows: ProductRow[] }) {
       },
     },
     { id: 'sales', header: 'Πωλήσεις', accessorKey: 'totalSales', cell: ({ getValue }) => <span className="tabular-nums">{getValue() as number}</span> },
+    {
+      id: 'actions',
+      header: '',
+      enableSorting: false,
+      cell: ({ row }) => {
+        const r = row.original
+        return (
+          <div className="flex justify-end">
+            <RowActions
+              label={`Ενέργειες για ${r.nameEl ?? r.sku ?? 'το προϊόν'}`}
+              actions={[
+                { label: 'Επεξεργασία', href: `/products/${r.id}` },
+                {
+                  label: 'Εικόνες και σειρά',
+                  href: `/products/${r.id}#images`,
+                  hint: 'Η πρώτη εικόνα είναι η κύρια φωτογραφία',
+                },
+                { label: 'Χαρακτηριστικά', href: `/products/${r.id}#attributes` },
+                {
+                  label: 'Προβολή στο κατάστημα',
+                  href: r.slugEl ? `/proionta/${r.slugEl}` : undefined,
+                  disabled: !r.slugEl,
+                  hint: r.slugEl ? undefined : 'Λείπει ελληνικό slug',
+                },
+                {
+                  label: 'Άνοιγμα στο mylens.gr',
+                  href: r.permalinkEl ?? undefined,
+                  external: true,
+                  disabled: !r.permalinkEl,
+                },
+              ]}
+            />
+          </div>
+        )
+      },
+    },
   ], [])
 
   return (

@@ -125,6 +125,7 @@ model Product {
   images       ProductImage[]
   cartLines    CartLine[]
   brands       ProductBrand[]
+  orderLines   OrderLine[]
 
   @@index([type])
   @@index([status])
@@ -438,7 +439,88 @@ model Customer {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  orders Order[]
+
   @@index([source])
   @@index([EMAIL])
   @@index([NAME])
+}
+
+// ── Orders ───────────────────────────────────────────────
+// Mirrored read-only from WooCommerce. Orders placed through this storefront
+// are created upstream first (see lib/woo/orders.ts) and arrive back here on
+// the next pull, so there is exactly one source of truth for an order and it
+// is not this database.
+
+model Order {
+  id     String @id @default(cuid())
+  wooId  Int    @unique
+  /// Display number. Usually the id as a string, but plugins renumber, so it
+  /// is stored rather than derived.
+  number String
+  status String
+
+  currency      String   @default("EUR")
+  total         Decimal  @db.Decimal(12, 2)
+  totalTax      Decimal? @db.Decimal(12, 2)
+  shippingTotal Decimal? @db.Decimal(12, 2)
+  discountTotal Decimal? @db.Decimal(12, 2)
+
+  paymentMethod      String?
+  paymentMethodTitle String?
+  transactionId      String?
+
+  /// 0 upstream means a guest order; stored as null here.
+  wooCustomerId Int?
+  customerId    String?
+  customer      Customer? @relation(fields: [customerId], references: [id], onDelete: SetNull)
+
+  /// Denormalised from the billing block so the list renders without a join.
+  billingName String
+  email       String?
+  phone       String?
+  city        String?
+
+  customerNote String?
+
+  datePaid     DateTime?
+  dateCreated  DateTime
+  dateModified DateTime?
+
+  wooSnapshot Json?
+  syncedAt    DateTime @default(now())
+
+  lines OrderLine[]
+
+  @@index([status])
+  @@index([dateCreated])
+  @@index([customerId])
+  @@index([email])
+}
+
+model OrderLine {
+  id      String @id @default(cuid())
+  orderId String
+  order   Order  @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  wooLineId Int
+  name      String
+  sku       String?
+  quantity  Int     @default(1)
+  subtotal  Decimal @db.Decimal(12, 2)
+  total     Decimal @db.Decimal(12, 2)
+
+  wooProductId   Int?
+  wooVariationId Int?
+  /// Null when the order references a product that is not in the local mirror
+  /// — deleted upstream, or in a language group that was never pulled.
+  productId String?
+  product   Product? @relation(fields: [productId], references: [id], onDelete: SetNull)
+
+  /// Line-item meta as WooCommerce stores it, which for this shop is the
+  /// prescription: {"Βαθμός OD": "-2.50", "Καμπυλότητα OD": "8.60", …}.
+  meta Json?
+
+  @@unique([orderId, wooLineId])
+  @@index([productId])
 }

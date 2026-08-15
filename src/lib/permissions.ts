@@ -13,6 +13,7 @@ export const PERMISSIONS: PermissionDef[] = [
   { key: 'media.delete', description: 'Διαγραφή πολυμέσων' },
   { key: 'customer.view', description: 'Προβολή πελατών' },
   { key: 'customer.edit', description: 'Επεξεργασία πελατών' },
+  { key: 'order.view', description: 'Προβολή παραγγελιών' },
   { key: 'sync.view', description: 'Προβολή συγχρονισμού και ιστορικού' },
   { key: 'sync.run', description: 'Εκτέλεση λήψης από το WooCommerce' },
   { key: 'sync.push', description: 'Αποστολή αλλαγών στο WooCommerce' },
@@ -31,12 +32,12 @@ export const ROLE_DEFAULTS: Record<string, string[]> = {
     'category.view', 'category.edit',
     'brand.view', 'brand.edit',
     'media.view', 'media.upload',
-    'customer.view',
+    'customer.view', 'order.view',
     'sync.view', 'sync.run',
   ],
   VIEWER: [
     'product.view', 'category.view', 'brand.view',
-    'media.view', 'customer.view', 'sync.view',
+    'media.view', 'customer.view', 'order.view', 'sync.view',
   ],
 }
 

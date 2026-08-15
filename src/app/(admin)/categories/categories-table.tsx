@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { useMemo } from 'react'
 import type { ColumnDef } from '@tanstack/react-table'
 import { DataTable } from '@/components/data-table'
+import { RowActions } from '@/components/admin/row-actions'
 
 export type CategoryRow = {
   id: string
@@ -53,6 +54,35 @@ export function CategoriesTable({ rows }: { rows: CategoryRow[] }) {
       cell: ({ getValue }) => <span className="tabular-nums text-muted-foreground">{getValue() as number}</span>,
     },
     { id: 'menuOrder', header: 'Σειρά', accessorKey: 'menuOrder', cell: ({ getValue }) => <span className="tabular-nums">{getValue() as number}</span> },
+    {
+      id: 'actions',
+      header: '',
+      enableSorting: false,
+      cell: ({ row }) => {
+        const r = row.original
+        return (
+          <div className="flex justify-end">
+            <RowActions
+              label={`Ενέργειες για την κατηγορία ${r.nameEl ?? ''}`}
+              actions={[
+                { label: 'Επεξεργασία', href: `/categories/${r.id}` },
+                {
+                  label: 'Μετάφραση με DeepSeek',
+                  href: `/categories/${r.id}`,
+                  hint: 'Η μετάφραση γίνεται από τη σελίδα επεξεργασίας',
+                },
+                {
+                  label: 'Προϊόντα της κατηγορίας',
+                  href: r.nameEl ? `/proionta?category=${encodeURIComponent(r.nameEl)}` : undefined,
+                  disabled: !r.nameEl || r.productCount === 0,
+                  hint: r.productCount === 0 ? 'Δεν έχει προϊόντα' : undefined,
+                },
+              ]}
+            />
+          </div>
+        )
+      },
+    },
   ], [])
 
   return (

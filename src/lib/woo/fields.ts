@@ -48,6 +48,20 @@ export const ORDER_FIELDS = [
   'billing', 'date_created', 'date_modified',
 ] as const
 
+/**
+ * The full order, used by the orders screen. Heavier than ORDER_FIELDS because
+ * of `line_items`, which carries the prescription meta — the only place the
+ * chosen power per eye is recorded, since this shop does not use variations.
+ */
+export const ORDER_DETAIL_FIELDS = [
+  'id', 'number', 'status', 'currency',
+  'total', 'total_tax', 'shipping_total', 'discount_total',
+  'payment_method', 'payment_method_title', 'transaction_id',
+  'customer_id', 'customer_note',
+  'billing', 'shipping', 'line_items',
+  'date_paid', 'date_created', 'date_modified',
+] as const
+
 /** Comma-joined for the `_fields` query parameter. */
 export function fieldParam(list: readonly string[]): string {
   return list.join(',')

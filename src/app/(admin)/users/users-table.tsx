@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useTransition } from 'react'
+import { RowActions } from '@/components/admin/row-actions'
 import { createUser, resetUserPassword, setUserActive, setUserRole } from './actions'
 
 export type UserRow = {
@@ -114,21 +115,29 @@ export function UsersTable({ rows, roles }: { rows: UserRow[]; roles: RoleRow[] 
                   </span>
                 </td>
                 <td className="px-4 py-3">
-                  <div className="flex justify-end gap-1.5">
-                    <button
-                      disabled={pending}
-                      onClick={() => setResetting(resetting === u.id ? null : u.id)}
-                      className="cursor-pointer rounded-full border border-border px-3 py-1 text-xs hover:bg-accent"
-                    >
-                      Κωδικός
-                    </button>
-                    <button
-                      disabled={pending}
-                      onClick={() => run(() => setUserActive(u.id, !u.active))}
-                      className="cursor-pointer rounded-full border border-border px-3 py-1 text-xs hover:bg-accent"
-                    >
-                      {u.active ? 'Απενεργοποίηση' : 'Ενεργοποίηση'}
-                    </button>
+                  <div className="flex justify-end">
+                    <RowActions
+                      label={`Ενέργειες για ${u.name}`}
+                      actions={[
+                        {
+                          label: 'Αλλαγή κωδικού',
+                          onSelect: () => setResetting(resetting === u.id ? null : u.id),
+                        },
+                        {
+                          label: u.active ? 'Απενεργοποίηση' : 'Ενεργοποίηση',
+                          onSelect: () => run(() => setUserActive(u.id, !u.active)),
+                          danger: u.active,
+                          hint: u.active
+                            ? 'Ο χρήστης δεν θα μπορεί να συνδεθεί'
+                            : undefined,
+                        },
+                        { label: 'Ρόλοι και δικαιώματα', href: '/roles' },
+                        {
+                          label: 'Αποστολή email',
+                          href: `mailto:${u.email}`,
+                        },
+                      ]}
+                    />
                   </div>
 
                   {resetting === u.id && (
