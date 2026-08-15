@@ -126,7 +126,12 @@ model Product {
 model ProductTranslation {
   productId        String
   locale           String
-  wooId            Int       @unique
+  /// Null when this language has no WooCommerce post yet — e.g. a translation
+  /// created locally by DeepSeek for one of the 20 single-language products.
+  /// Publishing it means creating a Polylang post and linking the translation
+  /// group, which is a separate operation (phase 4). Postgres permits many
+  /// NULLs under a unique index, so this stays unique for real ids.
+  wooId            Int?      @unique
   wooModifiedAt    DateTime?
   wooSnapshot      Json?
   name             String

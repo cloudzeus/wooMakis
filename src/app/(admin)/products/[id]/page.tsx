@@ -4,6 +4,7 @@ import { prisma } from '@/lib/prisma'
 import { requirePermission } from '@/lib/rbac-server'
 import { can } from '@/lib/rbac'
 import { readGate } from '@/lib/woo/write'
+import { isDeepSeekConfigured } from '@/lib/deepseek'
 import { ProductEditor } from './product-editor'
 
 export const dynamic = 'force-dynamic'
@@ -37,6 +38,7 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
         canUpload={can(session, 'media.upload')}
         canDelete={can(session, 'media.delete')}
         canPush={can(session, 'sync.push')}
+        deepseekReady={isDeepSeekConfigured()}
         gate={gate}
         product={{
           id: product.id,

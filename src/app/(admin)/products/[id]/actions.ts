@@ -7,6 +7,7 @@ import { requirePermission } from '@/lib/rbac-server'
 import { bunnyUpload, cdnUrlFor } from '@/lib/bunny'
 import { buildDerivatives, contentHash, imageDimensions, storageKeyFor } from '@/lib/images'
 import { executeProductUpdate, planProductUpdate, type WritePlan } from '@/lib/woo/write'
+import { isDeepSeekConfigured, translateProductFields } from '@/lib/deepseek'
 
 export type ActionResult =
   | { ok: true; message: string }
@@ -126,6 +127,97 @@ export async function removeProductImage(productId: string, assetId: string): Pr
   return { ok: true, message: 'Η εικόνα αφαιρέθηκε από το προϊόν (παραμένει στο Bunny).' }
 }
 
+/**
+ * Translates a product into `toLocale` with DeepSeek and saves the result
+ * locally. Works for a locale that already exists (retranslate) and for one
+ * that does not (fill the gap) — 20 of the 214 products exist in one language
+ * only.
+ *
+ * Nothing is sent to WooCommerce. A translation row created here has wooId
+ * null, meaning it has no upstream post yet; publishing it would mean creating
+ * a Polylang post and linking the translation group, which is a separate
+ * operation deferred to phase 4.
+ */
+export async function translateProduct(
+  productId: string,
+  toLocale: string,
+): Promise<ActionResult> {
+  await requirePermission('product.edit')
+
+  if (!isDeepSeekConfigured()) {
+    return { ok: false, error: 'Λείπει το DEEPSEEK_API_KEY στο .env — η μετάφραση είναι απενεργοποιημένη.' }
+  }
+  if (!['el', 'en'].includes(toLocale)) {
+    return { ok: false, error: `Μη υποστηριζόμενη γλώσσα: ${toLocale}` }
+  }
+
+  const product = await prisma.product.findUniqueOrThrow({
+    where: { id: productId },
+    include: { translations: true },
+  })
+
+  // Prefer Greek as the source — it is the language the catalog is authored in.
+  const source =
+    product.translations.find(t => t.locale !== toLocale && t.locale === 'el')
+    ?? product.translations.find(t => t.locale !== toLocale)
+  if (!source) return { ok: false, error: 'Δεν υπάρχει γλώσσα-πηγή για μετάφραση.' }
+
+  let translated
+  try {
+    translated = await translateProductFields(
+      { name: source.name, shortDescription: source.shortDescription, description: source.description },
+      source.locale,
+      toLocale,
+    )
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : String(err) }
+  }
+
+  const existing = product.translations.find(t => t.locale === toLocale)
+  if (existing) {
+    await prisma.productTranslation.update({
+      where: { productId_locale: { productId, locale: toLocale } },
+      data: {
+        name: translated.name,
+        shortDescription: translated.shortDescription || null,
+        description: translated.description || null,
+      },
+    })
+  } else {
+    await prisma.productTranslation.create({
+      data: {
+        productId,
+        locale: toLocale,
+        // No upstream post exists for this language yet.
+        wooId: null,
+        name: translated.name,
+        slug: slugify(translated.name),
+        shortDescription: translated.shortDescription || null,
+        description: translated.description || null,
+      },
+    })
+  }
+
+  revalidatePath(`/products/${productId}`)
+  revalidatePath('/products')
+  return {
+    ok: true,
+    message: existing
+      ? `Η μετάφραση «${toLocale}» ενημερώθηκε από «${source.locale}».`
+      : `Δημιουργήθηκε νέα μετάφραση «${toLocale}» από «${source.locale}». Δεν έχει σταλεί στο WooCommerce.`,
+  }
+}
+
+function slugify(input: string): string {
+  return input
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 190) || 'product'
+}
+
 export type PushPreview = {
   plans: { locale: string; wooId: number; plan: WritePlan }[]
   gate: { allowWrites: boolean; dryRun: boolean; environment: string }
@@ -153,8 +245,10 @@ export async function previewImagePush(productId: string): Promise<PushPreview> 
 
   const gallery = product.images.map(pi => ({ src: pi.asset.cdnUrl, alt: pi.alt }))
 
+  // Locally created translations have no upstream post, so there is nothing to
+  // update for them — they are skipped rather than silently creating a post.
   const plans = product.translations
-    .filter(t => t.wooId)
+    .filter((t): t is typeof t & { wooId: number } => t.wooId !== null)
     .map(t => ({
       locale: t.locale,
       wooId: t.wooId,

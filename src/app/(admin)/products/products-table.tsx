@@ -8,7 +8,8 @@ import { DataTable } from '@/components/data-table'
 
 export type ProductTranslationDetail = {
   locale: string
-  wooId: number
+  /** Null for a locally created translation with no WooCommerce post yet. */
+  wooId: number | null
   name: string
   slug: string
   shortDescription: string | null
@@ -245,7 +246,9 @@ function ProductDetail({ row }: { row: ProductRow }) {
                 <span className="rounded-full bg-[var(--navy)]/10 px-2 py-0.5 text-[11px] uppercase text-[var(--navy)]">
                   {t.locale}
                 </span>
-                <span className="text-xs text-muted-foreground">Woo #{t.wooId}</span>
+                <span className="text-xs text-muted-foreground">
+                  {t.wooId ? `Woo #${t.wooId}` : 'τοπική'}
+                </span>
                 <span className="ml-auto text-xs text-muted-foreground">
                   Woo: {fmtDate(t.wooModifiedAt)}
                 </span>

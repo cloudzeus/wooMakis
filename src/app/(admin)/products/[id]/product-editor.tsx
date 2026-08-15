@@ -4,14 +4,14 @@ import Image from 'next/image'
 import { useRef, useState, useTransition } from 'react'
 import {
   previewImagePush, pushImagesToWoo, removeProductImage,
-  saveProductFields, uploadProductImage, type PushPreview,
+  saveProductFields, translateProduct, uploadProductImage, type PushPreview,
 } from './actions'
 
 type Img = {
   assetId: string; cdnUrl: string; mimeType: string; bytes: number
   width: number | null; height: number | null; position: number; alt: string | null
 }
-type Tr = { locale: string; wooId: number; name: string; shortDescription: string; permalink: string | null }
+type Tr = { locale: string; wooId: number | null; name: string; shortDescription: string; permalink: string | null }
 type Product = {
   id: string; wooGroupKey: number; sku: string; type: string; status: string
   price: string; regularPrice: string; onSale: boolean
@@ -20,11 +20,12 @@ type Product = {
 }
 
 export function ProductEditor({
-  product, canEdit, canUpload, canDelete, canPush, gate,
+  product, canEdit, canUpload, canDelete, canPush, gate, deepseekReady,
 }: {
   product: Product
   canEdit: boolean; canUpload: boolean; canDelete: boolean; canPush: boolean
   gate: { allowWrites: boolean; dryRun: boolean; environment: string }
+  deepseekReady: boolean
 }) {
   const [pending, start] = useTransition()
   const [toast, setToast] = useState<{ ok: boolean; text: string } | null>(null)
@@ -173,7 +174,41 @@ export function ProductEditor({
         </div>
 
         <div className="rounded-2xl border border-border bg-card p-5">
-          <h2 className="mb-3 font-display text-base font-semibold">Μεταφράσεις</h2>
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+            <h2 className="font-display text-base font-semibold">Μεταφράσεις</h2>
+            {canEdit && (
+              <div className="flex items-center gap-1.5">
+                {(['el', 'en'] as const).map(loc => {
+                  const exists = product.translations.some(t => t.locale === loc)
+                  return (
+                    <button
+                      key={loc}
+                      onClick={() =>
+                        start(async () => {
+                          const r = await translateProduct(product.id, loc)
+                          setToast(r.ok ? { ok: true, text: r.message } : { ok: false, text: r.error })
+                        })
+                      }
+                      disabled={pending || !deepseekReady}
+                      title={
+                        deepseekReady
+                          ? `${exists ? 'Επαναμετάφραση' : 'Δημιουργία μετάφρασης'} στα ${loc}`
+                          : 'Λείπει το DEEPSEEK_API_KEY'
+                      }
+                      className="cursor-pointer rounded-full border border-border px-3 py-1.5 text-xs hover:bg-accent disabled:opacity-40"
+                    >
+                      {exists ? '↻' : '+'} {loc.toUpperCase()}
+                    </button>
+                  )
+                })}
+              </div>
+            )}
+          </div>
+          {!deepseekReady && (
+            <p className="mb-3 rounded-xl bg-[var(--warning)]/10 px-3 py-2 text-xs text-[var(--warning)]">
+              ⚠ Η αυτόματη μετάφραση απαιτεί <code>DEEPSEEK_API_KEY</code> στο .env.
+            </p>
+          )}
           <div className="space-y-4">
             {form.translations.map((t, i) => {
               const meta = product.translations.find(x => x.locale === t.locale)
@@ -183,7 +218,7 @@ export function ProductEditor({
                     <span className="rounded-full bg-[var(--navy)]/10 px-2 py-0.5 text-[11px] uppercase text-[var(--navy)]">
                       {t.locale}
                     </span>
-                    <span className="text-xs text-muted-foreground">Woo #{meta?.wooId}</span>
+                    <span className="text-xs text-muted-foreground">{meta?.wooId ? `Woo #${meta.wooId}` : 'τοπική — δεν υπάρχει στο Woo'}</span>
                   </div>
                   <Field label="Όνομα" value={t.name} disabled={!canEdit}
                     onChange={v => {
