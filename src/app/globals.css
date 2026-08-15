@@ -10,6 +10,8 @@
   --font-sans: var(--font-sans);
   /* Storefront face — Open Sans, full Greek coverage. */
   --font-store: var(--font-store);
+  /* Storefront display face - Anton, carries Greek. */
+  --font-store-display: var(--font-store-display);
   --font-mono: var(--font-sans);
   --font-heading: var(--font-display);
   --font-display: var(--font-display);

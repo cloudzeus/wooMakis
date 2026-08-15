@@ -19,6 +19,10 @@ const nextConfig: NextConfig = {
       { protocol: 'https', hostname: 'woomakis.b-cdn.net' },
       // Fallback for assets not yet mirrored — MediaAsset keeps the origin url.
       { protocol: 'https', hostname: 'www.mylens.gr' },
+      // Placeholder lifestyle photography. mylens.gr has packshots only, so
+      // there is no real people-wearing-eyewear imagery to mirror. Swap these
+      // for brand photography before launch.
+      { protocol: 'https', hostname: 'picsum.photos' },
     ],
   },
 }

@@ -11,7 +11,7 @@ gsap.registerPlugin(ScrollTrigger, useGSAP)
  * Scroll-triggered entrance. Fade + rise, staggered across direct children.
  *
  * Motion here is orientation, not decoration: it tells you a new band of content
- * has entered. Everything is behind a prefers-reduced-motion check — when the
+ * has entered. Everything is behind a prefers-reduced-motion check  when the
  * user asks for less motion the content is simply present, never hidden.
  *
  * Only opacity and transform animate, so nothing triggers layout.
@@ -57,7 +57,7 @@ export function Reveal({
   )
 
   return (
-    // @ts-expect-error — polymorphic tag, ref shape is compatible
+    // @ts-expect-error  polymorphic tag, ref shape is compatible
     <Tag ref={scope} className={className}>
       {children}
     </Tag>

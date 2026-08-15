@@ -5,7 +5,7 @@ import gsap from 'gsap'
 import { useGSAP } from '@gsap/react'
 
 /**
- * Hero entrance. Runs once on mount — no scroll trigger, because the hero is
+ * Hero entrance. Runs once on mount  no scroll trigger, because the hero is
  * already in view and waiting for a scroll would just look broken.
  *
  * Elements opt in with data-hero="1|2|3"; the number is the order. Anything

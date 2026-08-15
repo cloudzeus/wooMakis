@@ -36,7 +36,7 @@ export function Catalog({
     return sorted
   }, [products, query, cat, brand, sort])
 
-  // The whole catalogue renders at once — ~208 cards is well inside what the
+  // The whole catalogue renders at once  ~208 cards is well inside what the
   // browser handles comfortably, and it means Cmd-F finds every product.
   const activeFilters = [cat, brand].filter(Boolean).length
 

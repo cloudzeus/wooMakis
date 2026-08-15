@@ -3,7 +3,8 @@
 import Image from 'next/image'
 import { useEffect, useRef, useState, useTransition } from 'react'
 import { addToCart } from '@/app/kalathi/actions'
-import { CREAM, INK, INK_MUTED, R_CARD, R_INNER, SURFACE_PRODUCT, TEAL, TEAL_DEEP } from './tokens'
+import { ICON_MD, ICON_SM, CheckCircle, Minus, Plus, WarningCircle, X, ArrowUpRight } from './icons'
+import { CREAM, INK, INK_FAINT, INK_MUTED, R_CARD, R_INNER, SURFACE, SURFACE_PRODUCT, TEAL, TEAL_DEEP } from './tokens'
 import type { StoreProduct } from './types'
 
 /** Strips WooCommerce markup so descriptions read as plain text in the panel. */
@@ -69,14 +70,14 @@ export function QuickView({ product, onClose }: { product: StoreProduct | null; 
           ref={closeRef}
           onClick={onClose}
           aria-label="Κλείσιμο"
-          className="absolute right-4 top-4 z-10 grid h-10 w-10 cursor-pointer place-items-center rounded-full text-lg transition-colors hover:bg-black/5"
-          style={{ color: INK, background: 'rgb(255 255 255 / 88%)' }}
+          className="absolute right-4 top-4 z-10 grid h-11 w-11 cursor-pointer place-items-center rounded-full transition-colors hover:bg-black/5"
+          style={{ color: INK, background: 'rgb(255 255 255 / 90%)' }}
         >
-          ✕
+          <X size={ICON_MD} />
         </button>
 
         <div className="grid flex-1 overflow-y-auto sm:grid-cols-2">
-          {/* Gallery — white ground, contain, never cropped */}
+          {/* Gallery  white ground, contain, never cropped */}
           <div className="p-5 sm:p-7">
             <div
               className="relative aspect-square w-full overflow-hidden"
@@ -143,8 +144,9 @@ export function QuickView({ product, onClose }: { product: StoreProduct | null; 
               )}
             </div>
 
-            <p className="mt-2 text-[13px]" style={{ color: out ? '#B45309' : '#15803D' }}>
-              {out ? '⚠ Εξαντλημένο' : '✓ Διαθέσιμο'}
+            <p className="mt-2 flex items-center gap-1.5 text-[13px]" style={{ color: out ? '#B45309' : '#15803D' }}>
+              {out ? <WarningCircle size={ICON_SM} /> : <CheckCircle size={ICON_SM} />}
+              {out ? 'Εξαντλημένο' : 'Διαθέσιμο'}
             </p>
 
             {body && (
@@ -192,11 +194,15 @@ export function QuickView({ product, onClose }: { product: StoreProduct | null; 
 
             <div className="mt-6 flex items-center gap-3">
               <div className="flex items-center rounded-full border" style={{ borderColor: 'rgb(11 15 16 / 14%)' }}>
-                <button onClick={() => setQty(q => Math.max(1, q - 1))} aria-label="Μείωση"
-                        className="h-11 w-11 cursor-pointer rounded-full text-lg hover:bg-black/5">−</button>
+                <button onClick={() => setQty(q => Math.max(1, q - 1))} aria-label="Μείωση ποσότητας"
+                        className="grid h-11 w-11 cursor-pointer place-items-center rounded-full hover:bg-black/5">
+                  <Minus size={ICON_SM} />
+                </button>
                 <span className="w-8 text-center text-sm tabular-nums">{qty}</span>
-                <button onClick={() => setQty(q => Math.min(99, q + 1))} aria-label="Αύξηση"
-                        className="h-11 w-11 cursor-pointer rounded-full text-lg hover:bg-black/5">+</button>
+                <button onClick={() => setQty(q => Math.min(99, q + 1))} aria-label="Αύξηση ποσότητας"
+                        className="grid h-11 w-11 cursor-pointer place-items-center rounded-full hover:bg-black/5">
+                  <Plus size={ICON_SM} />
+                </button>
               </div>
 
               <button
@@ -221,10 +227,11 @@ export function QuickView({ product, onClose }: { product: StoreProduct | null; 
                 href={product.permalink}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="mt-3 text-center text-[12.5px] underline underline-offset-2"
+                className="mt-3 flex items-center justify-center gap-1 text-[12.5px] underline underline-offset-2"
                 style={{ color: INK_MUTED }}
               >
-                Πλήρη στοιχεία στο mylens.gr ↗
+                Πλήρη στοιχεία στο mylens.gr
+                <ArrowUpRight size={ICON_SM} />
               </a>
             )}
           </div>

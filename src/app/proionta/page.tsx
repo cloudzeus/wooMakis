@@ -9,7 +9,7 @@ import { Catalog } from './catalog'
 export const dynamic = 'force-dynamic'
 
 export const metadata: Metadata = {
-  title: 'Προϊόντα — mylens.gr',
+  title: 'Προϊόντα  mylens.gr',
   description: 'Όλα τα προϊόντα: φακοί επαφής, υγρά φροντίδας, γυαλιά ηλίου και αξεσουάρ.',
 }
 
@@ -39,7 +39,7 @@ export default async function ProductsPage() {
     const attrs = Array.isArray(p.attributes) ? (p.attributes as WooAttribute[]) : []
     return {
       id: p.id,
-      name: el?.name ?? '—',
+      name: el?.name ?? '',
       nameEn: en?.name ?? null,
       slug: el?.slug ?? '',
       sku: p.sku,
@@ -82,7 +82,7 @@ export default async function ProductsPage() {
           <p className="text-[11px] font-bold uppercase tracking-[0.16em]" style={{ color: TEAL_DEEP }}>
             Κατάλογος
           </p>
-          <h1 className="mt-2 text-[40px] font-extrabold leading-[0.95] tracking-[-0.035em] sm:text-[56px]" style={{ color: INK }}>
+          <h1 className="mt-2 font-store-display font-black text-[40px] uppercase leading-[0.95] tracking-[-0.01em] sm:text-[56px]" style={{ color: INK }}>
             Όλα τα προϊόντα
           </h1>
           <p className="mt-3 max-w-lg text-[15px] leading-relaxed" style={{ color: INK_MUTED }}>

@@ -16,6 +16,7 @@
     "@auth/core": "^0.41.3",
     "@base-ui/react": "^1.7.0",
     "@gsap/react": "^2.1.2",
+    "@phosphor-icons/react": "^2.1.10",
     "@prisma/adapter-pg": "^7.9.1",
     "@prisma/client": "^7.9.1",
     "@tanstack/react-table": "^8.21.3",

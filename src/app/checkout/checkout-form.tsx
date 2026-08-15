@@ -27,7 +27,7 @@ export function CheckoutForm({ summary, ordersEnabled }: { summary: Summary; ord
     start(async () => {
       const r = await placeOrder(form)
       if (!r.ok) { setError(r.error); return }
-      // Leaving for WooCommerce's payment page — a full navigation, not a
+      // Leaving for WooCommerce's payment page  a full navigation, not a
       // client-side route change, because the destination is another origin.
       window.location.href = r.paymentUrl
     })

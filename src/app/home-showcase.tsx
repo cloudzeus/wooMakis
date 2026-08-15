@@ -15,14 +15,14 @@ export function HomeShowcase({ products }: { products: StoreProduct[] }) {
     <section className="mt-3 p-8 sm:p-11" style={{ background: SURFACE, borderRadius: R_CARD }}>
       <div className="mb-8 flex flex-wrap items-end justify-between gap-5">
         <h2
-          className="text-[clamp(28px,4vw,38px)] font-extrabold leading-[0.95] tracking-[-0.035em]"
+          className="font-store-display font-black text-[clamp(28px,4vw,38px)] uppercase leading-[0.95] tracking-[-0.01em]"
           style={{ color: INK }}
         >
           Δημοφιλή<br />προϊόντα
         </h2>
         <div className="flex items-end gap-6">
           <p className="hidden max-w-xs text-[13.5px] leading-relaxed sm:block" style={{ color: INK_MUTED }}>
-            Η πληρωμή ολοκληρώνεται με ασφάλεια στο mylens.gr — δεν αποθηκεύουμε
+            Η πληρωμή ολοκληρώνεται με ασφάλεια στο mylens.gr  δεν αποθηκεύουμε
             στοιχεία κάρτας.
           </p>
           <Link

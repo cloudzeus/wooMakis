@@ -14,7 +14,7 @@ export type BannerCat = {
 /**
  * Category banners: two wide cards over a row of smaller ones, so the band has
  * its own rhythm rather than repeating the uniform grid above it. Imagery is a
- * real product from each category, on white — never a tinted tile.
+ * real product from each category, on white  never a tinted tile.
  */
 export function PromoBanners({ cats }: { cats: BannerCat[] }) {
   const [lead, second, ...rest] = cats
@@ -54,7 +54,7 @@ function BigBanner({ cat, tone }: { cat: BannerCat; tone: 'teal' | 'cream' }) {
           Κατηγορία
         </p>
         <h3
-          className="mt-3 text-[clamp(26px,3.4vw,38px)] font-extrabold uppercase leading-[0.92] tracking-[-0.035em]"
+          className="mt-3 font-store-display font-black text-[clamp(26px,3.4vw,38px)] uppercase leading-[0.92] tracking-[-0.01em]"
           style={{ color: INK }}
         >
           {cat.name}

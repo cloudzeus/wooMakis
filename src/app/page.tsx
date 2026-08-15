@@ -7,6 +7,8 @@ import { HomeShowcase } from './home-showcase'
 import { HeroMotion } from '@/components/store/hero-motion'
 import { Marquee } from '@/components/store/marquee'
 import { PromoBanners, type BannerCat } from '@/components/store/promo-banners'
+import { EditorialBand } from '@/components/store/editorial-band'
+import { ArrowRight, ICON_MD, ICON_SM, Sparkle } from '@/components/store/icons'
 import { Reveal } from '@/components/store/reveal'
 import {
   CANVAS, CREAM, HAIRLINE, INK, INK_FAINT, INK_MUTED,
@@ -68,7 +70,7 @@ export default async function HomePage() {
     const attrs = Array.isArray(p.attributes) ? (p.attributes as WooAttribute[]) : []
     return {
       id: p.id,
-      name: el?.name ?? '—',
+      name: el?.name ?? '',
       nameEn: en?.name ?? null,
       slug: el?.slug ?? '',
       sku: p.sku,
@@ -89,7 +91,7 @@ export default async function HomePage() {
   })
 
   const bannerCats: BannerCat[] = bannerRows.map(c => ({
-    name: pick(c.translations)?.name ?? '—',
+    name: pick(c.translations)?.name ?? '',
     count: c._count.products,
     imageUrl: c.products[0]?.product.images[0]?.asset.cdnUrl ?? null,
   }))
@@ -112,14 +114,14 @@ export default async function HomePage() {
             <div>
               <span
                 className="inline-flex items-center gap-2 rounded-full px-3.5 py-1.5 text-[10.5px] font-bold uppercase tracking-[0.15em]"
-                style={{ background: INK, color: '#fff' }}
+                style={{ background: INK, color: SURFACE }}
               >
-                <span className="h-1.5 w-1.5 rounded-full" style={{ background: TEAL }} />
+                <Sparkle size={ICON_SM} weight="fill" />
                 Επίσημος διανομέας
               </span>
 
               <h1
-                className="mt-8 text-[clamp(44px,8vw,88px)] font-extrabold uppercase leading-[0.87] tracking-[-0.045em]"
+                className="mt-8 font-store-display font-black text-[clamp(48px,8.4vw,92px)] uppercase leading-[0.86] tracking-[-0.005em]"
                 style={{ color: INK }}
               >
                 Δες τη<br />
@@ -135,23 +137,17 @@ export default async function HomePage() {
             <div className="mt-10 flex flex-wrap items-center gap-3">
               <Link
                 href="/proionta"
-                className="rounded-full px-8 py-4 text-sm font-bold transition-transform motion-safe:hover:-translate-y-0.5"
-                style={{ background: INK, color: '#fff' }}
+                className="inline-flex items-center gap-2 rounded-full px-8 py-4 text-sm font-bold transition-transform motion-safe:hover:-translate-y-0.5"
+                style={{ background: INK, color: SURFACE }}
               >
                 Δες όλα τα προϊόντα
-              </Link>
-              <Link
-                href="/proionta#katigories"
-                className="rounded-full border px-8 py-4 text-sm font-semibold transition-colors hover:border-black/35"
-                style={{ borderColor: HAIRLINE, color: INK }}
-              >
-                Κατηγορίες
+                <ArrowRight size={ICON_MD} weight="bold" />
               </Link>
             </div>
           </div>
 
           {/* Right column: hero product over stat strip */}
-          <div className="grid gap-3 lg:col-span-5">
+          <div className="lg:col-span-5">
             {hero && (
               <Link
                 href="/proionta"
@@ -160,7 +156,7 @@ export default async function HomePage() {
                 style={{ background: SURFACE_PRODUCT, borderRadius: R_CARD }}
               >
                 {hero.images[0] && (
-                  <div className="relative aspect-[4/3] w-full">
+                  <div className="relative aspect-square w-full">
                     <Image
                       src={hero.images[0].url}
                       alt={hero.name}
@@ -196,18 +192,6 @@ export default async function HomePage() {
               </Link>
             )}
 
-            <div className="grid grid-cols-3 gap-3">
-              {[
-                { n: productCount, l: 'Προϊόντα' },
-                { n: brands.length, l: 'Μάρκες' },
-                { n: categories.length, l: 'Κατηγορίες' },
-              ].map(s => (
-                <div key={s.l} data-hero="3" className="px-3 py-7 text-center" style={{ background: SURFACE, borderRadius: R_CARD }}>
-                  <p className="text-[32px] font-extrabold leading-none tabular-nums" style={{ color: INK }}>{s.n}</p>
-                  <p className="mt-2 text-[10.5px] font-semibold uppercase tracking-[0.11em]" style={{ color: INK_MUTED }}>{s.l}</p>
-                </div>
-              ))}
-            </div>
           </div>
         </section>
         </HeroMotion>
@@ -221,7 +205,7 @@ export default async function HomePage() {
             'Δωρεάν αποστολή άνω των 40 €',
             'Γνήσια προϊόντα',
             'Επίσημος διανομέας',
-            'Αποστολή σε 1–3 ημέρες',
+            'Αποστολή σε 1-3 ημέρες',
             'Υποστήριξη από οπτικούς',
             'Ασφαλής πληρωμή',
           ].map(t => (
@@ -242,43 +226,16 @@ export default async function HomePage() {
         {/* ── Products ── */}
         <HomeShowcase products={products} />
 
-        {/* ── Editorial + categories ── */}
-        <Reveal className="mt-3 grid gap-3 lg:grid-cols-12" as="section" stagger={0.1}>
-          <div
-            className="flex flex-col justify-between p-8 sm:p-11 lg:col-span-4"
-            style={{ background: TEAL, borderRadius: R_CARD }}
-          >
-            <div>
-              <p className="text-[10.5px] font-bold uppercase tracking-[0.16em]" style={{ color: 'rgb(11 15 16 / 55%)' }}>
-                Γιατί mylens
-              </p>
-              <h2
-                className="mt-5 text-[clamp(30px,4vw,42px)] font-extrabold uppercase leading-[0.92] tracking-[-0.035em]"
-                style={{ color: INK }}
-              >
-                Καθαρή<br />όραση,<br />κάθε μέρα
-              </h2>
-            </div>
-            <ul className="mt-8 space-y-3 text-[14px]" style={{ color: 'rgb(11 15 16 / 78%)' }}>
-              {['Γνήσια προϊόντα από επίσημους διανομείς',
-                'Αποστολή σε όλη την Ελλάδα',
-                'Υποστήριξη από οπτικούς'].map(t => (
-                <li key={t} className="flex gap-2.5">
-                  <span aria-hidden style={{ color: INK }}>—</span>
-                  <span>{t}</span>
-                </li>
-              ))}
-            </ul>
-          </div>
+        {/* One deliberate dark band. See editorial-band.tsx for why. */}
+        <EditorialBand imageUrl="https://picsum.photos/seed/mylens-eyewear-portrait/1200/1400" />
 
-          <div className="p-8 sm:p-11 lg:col-span-8" style={{ background: SURFACE, borderRadius: R_CARD }}>
-            <div className="mb-7 flex items-end justify-between gap-4">
-              <h2 className="text-[26px] font-extrabold tracking-[-0.025em]" style={{ color: INK }}>Κατηγορίες</h2>
-              <Link href="/proionta" className="text-[13px] transition-colors hover:text-black" style={{ color: INK_MUTED }}>
-                Όλα →
-              </Link>
-            </div>
-            <ul className="grid gap-2 sm:grid-cols-2">
+        {/* Categories */}
+        <Reveal className="mt-3 p-8 sm:p-11" as="section" stagger={0.05}>
+          <div style={{ background: SURFACE, borderRadius: R_CARD }} className="p-8 sm:p-11">
+            <h2 className="mb-7 font-store-display font-black text-[32px] uppercase tracking-[-0.005em]" style={{ color: INK }}>
+              Κατηγορίες
+            </h2>
+            <ul className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
               {categories.map(c => (
                 <li key={c.id}>
                   <Link
@@ -286,7 +243,7 @@ export default async function HomePage() {
                     className="flex items-center justify-between rounded-2xl px-5 py-4 transition-colors"
                     style={{ background: CANVAS }}
                   >
-                    <span className="text-[14px]" style={{ color: INK }}>{pick(c.translations)?.name ?? '—'}</span>
+                    <span className="text-[14px]" style={{ color: INK }}>{pick(c.translations)?.name ?? 'Χωρίς όνομα'}</span>
                     <span className="text-[12px] tabular-nums" style={{ color: INK_FAINT }}>{c._count.products}</span>
                   </Link>
                 </li>
@@ -297,7 +254,7 @@ export default async function HomePage() {
 
         {/* ── Brands ── */}
         <section className="mt-3 p-8 sm:p-11" style={{ background: SURFACE, borderRadius: R_CARD }}>
-          <h2 className="mb-6 text-[26px] font-extrabold tracking-[-0.025em]" style={{ color: INK }}>
+          <h2 className="mb-6 font-store-display font-black text-[32px] uppercase tracking-[-0.005em]" style={{ color: INK }}>
             Μάρκες
           </h2>
           <ul className="flex flex-wrap gap-2">
@@ -308,7 +265,7 @@ export default async function HomePage() {
                   className="inline-flex items-center gap-2 rounded-full border px-4 py-2.5 text-[13.5px] transition-colors hover:border-black/40"
                   style={{ borderColor: HAIRLINE, color: INK }}
                 >
-                  {pick(b.translations)?.name ?? '—'}
+                  {pick(b.translations)?.name ?? ''}
                   <span className="text-[11px] tabular-nums" style={{ color: '#A9B0B2' }}>{b.count}</span>
                 </Link>
               </li>

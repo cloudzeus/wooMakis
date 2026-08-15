@@ -1,8 +1,9 @@
 import Image from 'next/image'
 import Link from 'next/link'
-import { CANVAS, HAIRLINE, INK, INK_MUTED, SURFACE, TEAL } from './tokens'
+import { ICON_MD, ShoppingBagOpen, SignIn } from './icons'
+import { HAIRLINE, INK, INK_MUTED, SURFACE } from './tokens'
 
-/** Shared storefront chrome. Same placement on every page — navigation must not move. */
+/** Shared chrome. Single line at desktop, 72px tall (cap is 80). */
 export function StoreHeader({ cartCount }: { cartCount: number }) {
   return (
     <header
@@ -10,8 +11,7 @@ export function StoreHeader({ cartCount }: { cartCount: number }) {
       style={{ background: 'rgb(242 241 237 / 88%)', borderColor: HAIRLINE }}
     >
       <div className="mx-auto flex h-[72px] max-w-[1440px] items-center justify-between gap-6 px-5 sm:px-8">
-        <Link href="/" aria-label="mylens — αρχική" className="shrink-0">
-          {/* Original logo: dark wordmark + brand teal, correct on a light ground. */}
+        <Link href="/" aria-label="mylens, αρχική" className="shrink-0">
           <Image src="/mylens-logo.svg" alt="mylens" width={64} height={36} priority />
         </Link>
 
@@ -24,14 +24,16 @@ export function StoreHeader({ cartCount }: { cartCount: number }) {
         <div className="flex items-center gap-2.5">
           <Link
             href="/kalathi"
-            className="flex h-10 items-center gap-2 rounded-full border px-4 text-[13px] transition-colors hover:border-black/35"
+            aria-label={cartCount > 0 ? `Καλάθι, ${cartCount} προϊόντα` : 'Καλάθι'}
+            className="flex h-11 items-center gap-2 rounded-full border px-4 text-[13px] transition-colors hover:border-black/35"
             style={{ borderColor: HAIRLINE, color: INK, background: SURFACE }}
           >
-            Καλάθι
+            <ShoppingBagOpen size={ICON_MD} />
+            <span className="hidden sm:inline">Καλάθι</span>
             {cartCount > 0 && (
               <span
                 className="rounded-full px-1.5 text-[11px] font-bold tabular-nums"
-                style={{ background: TEAL, color: INK }}
+                style={{ background: INK, color: SURFACE }}
               >
                 {cartCount}
               </span>
@@ -39,10 +41,11 @@ export function StoreHeader({ cartCount }: { cartCount: number }) {
           </Link>
           <Link
             href="/login"
-            className="flex h-10 items-center rounded-full px-4 text-[13px] font-semibold transition-transform motion-safe:hover:-translate-y-0.5"
-            style={{ background: INK, color: CANVAS }}
+            className="flex h-11 items-center gap-2 rounded-full px-4 text-[13px] font-semibold transition-transform motion-safe:hover:-translate-y-0.5"
+            style={{ background: INK, color: SURFACE }}
           >
-            Σύνδεση
+            <SignIn size={ICON_MD} />
+            <span className="hidden sm:inline">Σύνδεση</span>
           </Link>
         </div>
       </div>
@@ -58,14 +61,14 @@ export function StoreFooter() {
           <span>© {new Date().getFullYear()} mylens.gr</span>
           <div className="flex items-center gap-6">
             <a href="https://www.mylens.gr" target="_blank" rel="noopener noreferrer"
-               className="transition-colors hover:text-black">mylens.gr ↗</a>
+               className="transition-colors hover:text-black">mylens.gr</a>
             <Link href="/login" className="transition-colors hover:text-black">Διαχείριση</Link>
           </div>
         </div>
       </div>
       <p
         aria-hidden
-        className="-mb-[2.2vw] select-none px-5 text-[19vw] font-extrabold uppercase leading-[0.72] tracking-[-0.055em] sm:px-8"
+        className="-mb-[2.2vw] select-none px-5 font-store-display font-black text-[19vw] uppercase leading-[0.72] tracking-[-0.02em] sm:px-8"
         style={{ color: 'rgb(20 24 26 / 6%)' }}
       >
         mylens
