@@ -5,7 +5,11 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "start": "next start"
+    "start": "next start",
+    "test": "vitest run --passWithNoTests",
+    "db:migrate": "prisma migrate dev",
+    "db:seed": "tsx prisma/seed.ts",
+    "db:sync-permissions": "tsx prisma/sync-permissions.ts"
   },
   "dependencies": {
     "@auth/core": "^0.41.3",
