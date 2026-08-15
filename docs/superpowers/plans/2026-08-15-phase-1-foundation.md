@@ -1225,9 +1225,18 @@ git push
 - [ ] **Step 1: Confirm no secrets are tracked**
 
 ```bash
-git grep -nE "ck_[a-f0-9]{40}|cs_[a-f0-9]{40}|Erika|b175-4aae" -- $(git ls-files) \
-  && echo "SECRETS FOUND — stop and remove" || echo "clean"
+./.secretscan.sh
 ```
+
+Expected: `clean`
+
+The script matches structurally — a *populated* password inside a connection string, a
+Bunny `AccessKey`, a Woo consumer key — and filters out known placeholders
+(`USER:PASSWORD`, `<password>`, `$PGPASSWORD`). Matching on structure rather than on
+literal secret values means the check never becomes the thing it is looking for.
+
+Run it before **every** commit. Skipping it once is how the Postgres password reached a
+public repository on 2026-08-15.
 
 Expected: `clean`
 
