@@ -36,6 +36,7 @@ export async function uploadMedia(formData: FormData): Promise<MediaResult> {
   const file = formData.get('file')
   const title = String(formData.get('title') ?? '').trim()
   const altText = String(formData.get('altText') ?? '').trim()
+  const folderId = String(formData.get('folderId') ?? '').trim() || null
 
   if (!(file instanceof File) || file.size === 0) return { ok: false, error: 'Δεν επιλέχθηκε αρχείο.' }
   if (file.size > MAX_UPLOAD_BYTES) {
@@ -73,7 +74,13 @@ export async function uploadMedia(formData: FormData): Promise<MediaResult> {
   const hash = contentHash(body)
   const existing = await prisma.mediaAsset.findUnique({ where: { contentHash: hash } })
   if (existing) {
-    return { ok: true, message: 'Το αρχείο υπάρχει ήδη στη βιβλιοθήκη (ίδιο περιεχόμενο).' }
+    // Same bytes already stored. Honour the chosen folder rather than silently
+    // leaving the file wherever it was first uploaded.
+    if (folderId && existing.folderId !== folderId) {
+      await prisma.mediaAsset.update({ where: { id: existing.id }, data: { folderId } })
+    }
+    revalidatePath('/media')
+    return { ok: true, message: `${file.name}: υπάρχει ήδη (ίδιο περιεχόμενο).` }
   }
 
   const key = `library/${hash}/original.${ext}`
@@ -98,6 +105,7 @@ export async function uploadMedia(formData: FormData): Promise<MediaResult> {
       kind: 'LIBRARY',
       title: title || file.name,
       altText: altText || null,
+      folderId,
     },
   })
 
@@ -108,7 +116,7 @@ export async function uploadMedia(formData: FormData): Promise<MediaResult> {
   return {
     ok: true,
     message:
-      `${image ? 'Εικόνα' : 'Βίντεο'} ${humanSize(input.byteLength)} → ${humanSize(body.byteLength)}` +
+      `${file.name}: ${humanSize(input.byteLength)} → ${humanSize(body.byteLength)}` +
       `${saved > 0 ? ` (${pct}% μικρότερο)` : ''}, ${width}×${height}, max ${MAX_EDGE}px.`,
   }
 }
@@ -163,4 +171,89 @@ export async function deleteMedia(id: string): Promise<MediaResult> {
   await prisma.mediaAsset.delete({ where: { id } })
   revalidatePath('/media')
   return { ok: true, message: 'Διαγράφηκε από τη βιβλιοθήκη (το αρχείο παραμένει στο Bunny).' }
+}
+
+
+/* ── Folders ─────────────────────────────────────────── */
+
+function slugify(input: string): string {
+  return input
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 80) || 'folder'
+}
+
+export async function createFolder(name: string, parentId: string | null): Promise<MediaResult> {
+  await requirePermission('media.upload')
+
+  const clean = name.trim()
+  if (!clean) return { ok: false, error: 'Δώσε όνομα φακέλου.' }
+
+  const slug = slugify(clean)
+  const clash = await prisma.mediaFolder.findFirst({ where: { parentId, slug } })
+  if (clash) return { ok: false, error: `Υπάρχει ήδη φάκελος «${clash.name}» εδώ.` }
+
+  await prisma.mediaFolder.create({ data: { name: clean, slug, parentId } })
+  revalidatePath('/media')
+  return { ok: true, message: `Δημιουργήθηκε ο φάκελος «${clean}».` }
+}
+
+export async function renameFolder(id: string, name: string): Promise<MediaResult> {
+  await requirePermission('media.upload')
+  const clean = name.trim()
+  if (!clean) return { ok: false, error: 'Δώσε όνομα φακέλου.' }
+
+  const folder = await prisma.mediaFolder.findUnique({ where: { id } })
+  if (!folder) return { ok: false, error: 'Ο φάκελος δεν βρέθηκε.' }
+
+  const slug = slugify(clean)
+  const clash = await prisma.mediaFolder.findFirst({
+    where: { parentId: folder.parentId, slug, NOT: { id } },
+  })
+  if (clash) return { ok: false, error: `Υπάρχει ήδη φάκελος «${clash.name}» εδώ.` }
+
+  await prisma.mediaFolder.update({ where: { id }, data: { name: clean, slug } })
+  revalidatePath('/media')
+  return { ok: true, message: 'Ο φάκελος μετονομάστηκε.' }
+}
+
+/**
+ * Removes a folder. Subfolders cascade, but the ASSETS inside are not deleted -
+ * the foreign key is ON DELETE SET NULL, so they fall back to the root. Deleting
+ * a folder must never be a way to lose files by accident.
+ */
+export async function deleteFolder(id: string): Promise<MediaResult> {
+  await requirePermission('media.delete')
+
+  const folder = await prisma.mediaFolder.findUnique({
+    where: { id },
+    include: { _count: { select: { assets: true, children: true } } },
+  })
+  if (!folder) return { ok: false, error: 'Ο φάκελος δεν βρέθηκε.' }
+
+  await prisma.mediaFolder.delete({ where: { id } })
+  revalidatePath('/media')
+
+  const moved = folder._count.assets
+  return {
+    ok: true,
+    message: moved
+      ? `Ο φάκελος διαγράφηκε. ${moved} αρχεία μεταφέρθηκαν στη ρίζα.`
+      : 'Ο φάκελος διαγράφηκε.',
+  }
+}
+
+export async function moveAssets(assetIds: string[], folderId: string | null): Promise<MediaResult> {
+  await requirePermission('media.upload')
+  if (!assetIds.length) return { ok: false, error: 'Δεν επιλέχθηκαν αρχεία.' }
+
+  await prisma.mediaAsset.updateMany({
+    where: { id: { in: assetIds }, kind: 'LIBRARY' },
+    data: { folderId },
+  })
+  revalidatePath('/media')
+  return { ok: true, message: `${assetIds.length} αρχεία μεταφέρθηκαν.` }
 }

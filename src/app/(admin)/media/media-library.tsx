@@ -1,9 +1,12 @@
 'use client'
 
 import Image from 'next/image'
-import { useRef, useState, useTransition } from 'react'
+import { useRouter } from 'next/navigation'
+import { useMemo, useState, useTransition } from 'react'
 import { SLOTS } from '@/lib/storefront-slots'
-import { assignSlot, deleteMedia, updateMedia, uploadMedia } from './actions'
+import { assignSlot, deleteMedia, moveAssets, updateMedia } from './actions'
+import { FolderBar, type FolderNode } from './folder-bar'
+import { UploadQueue } from './upload-queue'
 
 export type LibraryItem = {
   id: string
@@ -17,6 +20,7 @@ export type LibraryItem = {
   slot: string | null
   createdAt: string
   durationSeconds: number | null
+  folderId: string | null
 }
 
 function human(bytes: number): string {
@@ -26,110 +30,106 @@ function human(bytes: number): string {
 }
 
 export function MediaLibrary({
-  items, canUpload, canDelete, canAssign, ffmpegReady,
+  items, folders, canUpload, canDelete, canAssign, ffmpegReady,
 }: {
   items: LibraryItem[]
+  folders: FolderNode[]
   canUpload: boolean
   canDelete: boolean
   canAssign: boolean
   ffmpegReady: boolean
 }) {
+  const router = useRouter()
   const [pending, start] = useTransition()
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null)
   const [editing, setEditing] = useState<string | null>(null)
-  const formRef = useRef<HTMLFormElement>(null)
+  const [folderId, setFolderId] = useState<string | null>(null)
+  const [selected, setSelected] = useState<Set<string>>(new Set())
 
-  function onSubmit(e: React.FormEvent<HTMLFormElement>) {
-    e.preventDefault()
-    const fd = new FormData(e.currentTarget)
-    setMsg(null)
-    start(async () => {
-      const r = await uploadMedia(fd)
-      setMsg(r.ok ? { ok: true, text: r.message } : { ok: false, text: r.error })
-      if (r.ok) formRef.current?.reset()
+  // Root shows only unfiled assets, so opening a folder is the only way to see
+  // its contents and "Όλα τα αρχεία" does not duplicate everything.
+  const visible = useMemo(
+    () => items.filter(i => i.folderId === folderId),
+    [items, folderId],
+  )
+
+  function toggle(id: string) {
+    setSelected(prev => {
+      const next = new Set(prev)
+      next.has(id) ? next.delete(id) : next.add(id)
+      return next
     })
   }
 
   return (
-    <div className="space-y-5">
-      <form
-        ref={formRef}
-        onSubmit={onSubmit}
-        className="rounded-2xl border border-border bg-card p-5"
-      >
-        <h2 className="mb-1 font-display text-base font-semibold">Μεταφόρτωση</h2>
-        <p className="mb-4 text-sm text-muted-foreground">
-          Οι εικόνες μετατρέπονται σε WebP με μέγιστη πλευρά 1920px. Τα βίντεο
-          συμπιέζονται σε MP4 (H.264/AAC), ίδιο όριο διαστάσεων.
-        </p>
+    <div className="space-y-4">
+      <FolderBar
+        folders={folders}
+        currentId={folderId}
+        onOpen={id => { setFolderId(id); setSelected(new Set()) }}
+        canManage={canUpload}
+        onChanged={m => { setMsg(m); router.refresh() }}
+      />
 
-        {!ffmpegReady && (
-          <p className="mb-4 rounded-xl bg-[var(--warning)]/10 px-3 py-2 text-xs text-[var(--warning)]">
-            ⚠ Το ffmpeg δεν βρέθηκε στον server. Η μεταφόρτωση εικόνων λειτουργεί
-            κανονικά, τα βίντεο όχι.
-          </p>
-        )}
+      <UploadQueue
+        folderId={folderId}
+        canUpload={canUpload}
+        ffmpegReady={ffmpegReady}
+        onDone={() => router.refresh()}
+      />
 
-        <div className="grid gap-3 sm:grid-cols-3">
-          <label className="block space-y-1 sm:col-span-1">
-            <span className="block text-xs font-medium uppercase tracking-wide text-muted-foreground">
-              Αρχείο
-            </span>
-            <input
-              type="file" name="file" required
-              accept={ffmpegReady ? 'image/*,video/*' : 'image/*'}
-              disabled={!canUpload || pending}
-              className="w-full cursor-pointer rounded-xl border border-border bg-card p-2 text-sm file:mr-3 file:cursor-pointer file:rounded-full file:border-0 file:bg-primary file:px-3 file:py-1.5 file:text-xs file:text-primary-foreground"
-            />
-          </label>
-          <label className="block space-y-1">
-            <span className="block text-xs font-medium uppercase tracking-wide text-muted-foreground">
-              Τίτλος
-            </span>
-            <input name="title" disabled={!canUpload || pending}
-              className="h-10 w-full rounded-full border border-border bg-card px-4 text-sm outline-none focus:ring-2 focus:ring-ring" />
-          </label>
-          <label className="block space-y-1">
-            <span className="block text-xs font-medium uppercase tracking-wide text-muted-foreground">
-              Εναλλακτικό κείμενο
-            </span>
-            <input name="altText" disabled={!canUpload || pending}
-              className="h-10 w-full rounded-full border border-border bg-card px-4 text-sm outline-none focus:ring-2 focus:ring-ring" />
-          </label>
-        </div>
-
-        <button
-          type="submit" disabled={!canUpload || pending}
-          className="mt-4 h-10 cursor-pointer rounded-full bg-primary px-6 text-sm font-medium text-primary-foreground disabled:opacity-50"
-        >
-          {pending ? 'Επεξεργασία…' : 'Μεταφόρτωση'}
-        </button>
-
-        {msg && (
-          <p
-            role="status"
-            className={`mt-3 rounded-xl px-3 py-2 text-sm ${
-              msg.ok ? 'bg-[var(--success)]/12 text-[var(--success)]' : 'bg-destructive/10 text-destructive'
-            }`}
+      {selected.size > 0 && canUpload && (
+        <div className="flex flex-wrap items-center gap-3 rounded-2xl border border-border bg-card p-3">
+          <span className="text-sm tabular-nums">{selected.size} επιλεγμένα</span>
+          <select
+            defaultValue=""
+            onChange={e =>
+              start(async () => {
+                const r = await moveAssets([...selected], e.target.value || null)
+                setMsg(r.ok ? { ok: true, text: r.message } : { ok: false, text: r.error })
+                setSelected(new Set())
+                router.refresh()
+              })
+            }
+            aria-label="Μεταφορά σε φάκελο"
+            className="h-9 cursor-pointer rounded-full border border-border bg-card px-4 text-sm"
           >
-            {msg.ok ? '✓ ' : '⚠ '}{msg.text}
-          </p>
-        )}
-      </form>
+            <option value="" disabled>Μεταφορά σε…</option>
+            <option value="">Ρίζα (χωρίς φάκελο)</option>
+            {folders.map(f => <option key={f.id} value={f.id}>{f.name}</option>)}
+          </select>
+          <button
+            onClick={() => setSelected(new Set())}
+            className="h-9 rounded-full border border-border px-4 text-sm"
+          >
+            Καθαρισμός
+          </button>
+        </div>
+      )}
 
-      {items.length === 0 ? (
+      {visible.length === 0 ? (
         <div className="rounded-2xl border border-dashed border-border px-6 py-16 text-center">
           <p className="text-sm text-muted-foreground">
-            Η βιβλιοθήκη είναι άδεια. Ανέβασε μια εικόνα για να τη χρησιμοποιήσεις στο site.
+            {folderId ? 'Ο φάκελος είναι άδειος.' : 'Η βιβλιοθήκη είναι άδεια.'} Ανέβασε αρχεία για να τα χρησιμοποιήσεις στο site.
           </p>
         </div>
       ) : (
         <ul className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-          {items.map(it => {
+          {visible.map(it => {
             const isVideo = it.mimeType.startsWith('video/')
             return (
-              <li key={it.id} className="overflow-hidden rounded-2xl border border-border bg-card">
+              <li key={it.id} className={`overflow-hidden rounded-2xl border bg-card ${selected.has(it.id) ? 'border-[var(--navy)]' : 'border-border'}`}>
                 <div className="relative aspect-video bg-white">
+                  {canUpload && (
+                    <label className="absolute right-2 top-2 z-10 flex h-6 w-6 cursor-pointer items-center justify-center rounded-md bg-card/90 shadow">
+                      <input
+                        type="checkbox"
+                        checked={selected.has(it.id)}
+                        onChange={() => toggle(it.id)}
+                        aria-label={`Επιλογή ${it.title ?? 'αρχείου'}`}
+                      />
+                    </label>
+                  )}
                   {isVideo ? (
                     <video src={it.cdnUrl} controls preload="metadata" className="h-full w-full object-contain" />
                   ) : (

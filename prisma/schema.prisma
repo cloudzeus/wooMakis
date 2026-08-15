@@ -183,6 +183,25 @@ model ProductCategory {
   @@index([categoryId])
 }
 
+/// Folders in the media library. Self-referencing so they can nest; deleting a
+/// parent cascades to its children, but assets inside are moved to the root
+/// rather than deleted (see deleteFolder).
+model MediaFolder {
+  id        String   @id @default(cuid())
+  name      String
+  slug      String
+  parentId  String?
+  parent    MediaFolder?  @relation("FolderTree", fields: [parentId], references: [id], onDelete: Cascade)
+  children  MediaFolder[] @relation("FolderTree")
+  assets    MediaAsset[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  /// Unique per level, not globally: "banners" may exist under two parents.
+  @@unique([parentId, slug])
+  @@index([parentId])
+}
+
 enum MediaKind {
   /// Mirrored from a WooCommerce product image.
   PRODUCT
@@ -206,9 +225,11 @@ model MediaAsset {
   mirroredAt  DateTime?
   createdAt   DateTime  @default(now())
 
-  kind    MediaKind @default(PRODUCT)
-  title   String?
-  altText String?
+  kind     MediaKind    @default(PRODUCT)
+  title    String?
+  altText  String?
+  folderId String?
+  folder   MediaFolder? @relation(fields: [folderId], references: [id], onDelete: SetNull)
   /// Names a fixed position on the storefront, e.g. "editorial-hero". Unique so
   /// a slot resolves to exactly one asset; null for ordinary library images.
   slot    String?   @unique
@@ -217,6 +238,7 @@ model MediaAsset {
 
   @@index([sourceUrl])
   @@index([kind])
+  @@index([folderId])
 }
 
 model ProductImage {
