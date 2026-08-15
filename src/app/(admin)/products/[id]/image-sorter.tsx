@@ -72,7 +72,16 @@ export function ImageSorter({
         μετακίνηση, Space ξανά για να την αφήσεις.
       </p>
 
-      <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={onDragEnd}>
+      {/* A stable id is required, not cosmetic. dnd-kit derives its screen
+          reader ids (`DndDescribedBy-N`) from a module-global counter, so the
+          server renders 0 and the client 1, and React reports a hydration
+          mismatch on every tile. */}
+      <DndContext
+        id="product-image-sorter"
+        sensors={sensors}
+        collisionDetection={closestCenter}
+        onDragEnd={onDragEnd}
+      >
         <SortableContext items={items.map(i => i.assetId)} strategy={rectSortingStrategy}>
           <ul className="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-6">
             {items.map((img, i) => (

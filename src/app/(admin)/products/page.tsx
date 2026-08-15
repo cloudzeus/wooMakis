@@ -1,3 +1,4 @@
+import Link from 'next/link'
 import { prisma } from '@/lib/prisma'
 import { requirePermission } from '@/lib/rbac-server'
 import { ProductsTable, type ProductRow } from './products-table'
@@ -86,6 +87,12 @@ export default async function ProductsPage() {
             )}
           </p>
         </div>
+        <Link
+          href="/products/new"
+          className="h-10 shrink-0 rounded-full bg-primary px-5 text-sm font-medium leading-10 text-primary-foreground"
+        >
+          + Νέο προϊόν
+        </Link>
       </header>
 
       <ProductsTable rows={rows} />

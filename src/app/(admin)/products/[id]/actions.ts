@@ -7,11 +7,12 @@ import { requirePermission } from '@/lib/rbac-server'
 import { bunnyUpload, cdnUrlFor } from '@/lib/bunny'
 import { buildDerivatives, contentHash, imageDimensions, storageKeyFor } from '@/lib/images'
 import {
-  executeUpdate, planProductUpdate, readBack, readGate, verifyFields,
+  executeUpdate, planCreate, planProductUpdate, readBack, readGate, verifyFields,
   type FieldVerdict, type WritePlan,
 } from '@/lib/woo/write'
 import { isDeepSeekConfigured, translateProductFields } from '@/lib/deepseek'
 import { normalizeAttributes, toWooPayload } from '@/lib/woo/attributes'
+import { slugify } from '@/lib/slug'
 
 export type ActionResult =
   | { ok: true; message: string }
@@ -297,15 +298,6 @@ export async function translateProduct(
   }
 }
 
-function slugify(input: string): string {
-  return input
-    .toLowerCase()
-    .normalize('NFD')
-    .replace(/[̀-ͯ]/g, '')
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '')
-    .slice(0, 190) || 'product'
-}
 
 // ── Push to WooCommerce ────────────────────────────────────
 //
@@ -323,10 +315,6 @@ export type PushScope = {
   attributes: boolean
   /** The whole gallery, in editor order. WooCommerce replaces it wholesale. */
   images: boolean
-}
-
-export const EMPTY_SCOPE: PushScope = {
-  content: false, pricing: false, attributes: false, images: false,
 }
 
 export type PushPreview = {
@@ -361,10 +349,17 @@ export async function previewProductPush(
 
   const warnings: string[] = []
 
+  /** False for a product created here that has never been published upstream. */
+  const existsUpstream = product.translations.some(t => t.wooId !== null)
+
   // WordPress sideloads each src, so the Bunny CDN url is what it fetches.
   // The FULL gallery goes every time: a partial array deletes the rest.
   const images = product.images.map(pi => ({ src: pi.asset.cdnUrl, alt: pi.alt ?? '' }))
-  if (scope.images && images.length === 0) {
+
+  // Only a real warning when there is something upstream to destroy. On a
+  // create there is no gallery yet, and telling the operator their send will
+  // WIPE one is both false and alarming at the exact moment it matters.
+  if (scope.images && images.length === 0 && existsUpstream) {
     warnings.push('Το προϊόν δεν έχει εικόνες — η αποστολή θα ΣΒΗΣΕΙ τη συλλογή στο WooCommerce.')
   }
 
@@ -386,31 +381,59 @@ export async function previewProductPush(
     shared.regular_price = product.regularPrice?.toString() ?? ''
     shared.stock_status = product.stockStatus
   }
-  if (scope.attributes) shared.attributes = toWooPayload(attributes)
-  if (scope.images) shared.images = images
+  // An empty array is a deliberate "remove everything" on an update, and
+  // meaningless noise on a create — WooCommerce has nothing to clear.
+  if (scope.attributes && (attributes.length > 0 || existsUpstream)) {
+    shared.attributes = toWooPayload(attributes)
+  }
+  if (scope.images && (images.length > 0 || existsUpstream)) {
+    shared.images = images
+  }
 
-  const plans = product.translations
-    .filter((t): t is typeof t & { wooId: number } => t.wooId !== null)
-    .map(t => {
-      const body: Record<string, unknown> = { ...shared }
-      if (scope.content) {
-        body.name = t.name
-        body.short_description = t.shortDescription ?? ''
-        if (t.description) body.description = t.description
-      }
-      return { locale: t.locale, wooId: t.wooId, plan: planProductUpdate(t.wooId, body) }
-    })
-    .filter(p => Object.keys(p.plan.body).length > 0)
+  // Greek first, always. When the product is new, the Greek post has to exist
+  // before the English one can name it as its translation group.
+  const ordered = [...product.translations].sort((a, b) =>
+    a.locale === 'el' ? -1 : b.locale === 'el' ? 1 : a.locale.localeCompare(b.locale))
 
-  const skipped = product.translations.filter(t => t.wooId === null).map(t => t.locale)
-  if (skipped.length) {
+  const plans = ordered.map(t => {
+    const body: Record<string, unknown> = { ...shared }
+
+    if (t.wooId === null) {
+      // A create must carry the copy even when only pricing was ticked: a
+      // WooCommerce product with no name is not a product.
+      body.name = t.name
+      body.slug = t.slug
+      body.short_description = t.shortDescription ?? ''
+      if (t.description) body.description = t.description
+      body.type = product.type
+      body.status = product.status
+      body.sku = product.sku ?? ''
+      body.regular_price = product.regularPrice?.toString() ?? ''
+      body.stock_status = product.stockStatus
+      // Polylang exposes `lang` on the products endpoint — verified against
+      // the live store — and it is what puts the new post in the right
+      // language rather than the site default.
+      body.lang = t.locale
+      return { locale: t.locale, wooId: 0, plan: planCreate('products', body) }
+    }
+
+    if (scope.content) {
+      body.name = t.name
+      body.short_description = t.shortDescription ?? ''
+      if (t.description) body.description = t.description
+    }
+    return { locale: t.locale, wooId: t.wooId, plan: planProductUpdate(t.wooId, body) }
+  }).filter(p => Object.keys(p.plan.body).length > 0)
+
+  const creating = ordered.filter(t => t.wooId === null).map(t => t.locale)
+  if (creating.length) {
     warnings.push(
-      `Οι μεταφράσεις ${skipped.join(', ')} δεν υπάρχουν στο WooCommerce και παραλείπονται. ` +
-      'Η δημιουργία νέας γλώσσας απαιτεί σύνδεση ομάδας Polylang.',
+      `Οι γλώσσες ${creating.join(', ')} ΔΕΝ υπάρχουν ακόμα στο WooCommerce και θα ` +
+      'ΔΗΜΙΟΥΡΓΗΘΟΥΝ ως νέα προϊόντα. Η ενέργεια δεν αναιρείται από εδώ.',
     )
   }
 
-  return { plans, gate: readGate(), skipped, warnings }
+  return { plans, gate: readGate(), skipped: [], warnings }
 }
 
 export type PushReport = {
@@ -451,21 +474,53 @@ export async function pushProductToWoo(
   }
 
   const reports: PushReport[] = []
+  /** Ids assigned during this run, so the second language can link to the first. */
+  const created = new Map<string, number>()
+
   for (const { locale, wooId, plan } of preview.plans) {
+    const body = { ...plan.body }
+
+    // Link the new post into the existing translation group. Without this
+    // Polylang leaves it as a standalone product in that language and the two
+    // never appear as each other's translation.
+    if (plan.method === 'POST' && created.size > 0) {
+      body.translations = Object.fromEntries(created)
+    }
+
+    let response: Record<string, unknown>
     try {
-      await executeUpdate({ ...plan, wouldExecute: plan.gate.allowWrites && !plan.gate.dryRun })
+      response = await executeUpdate({
+        ...plan,
+        body,
+        wouldExecute: plan.gate.allowWrites && !plan.gate.dryRun,
+      })
     } catch (err) {
       return {
         ok: false,
-        error: `Απέτυχε η αποστολή για ${locale} (#${wooId}): ${err instanceof Error ? err.message : String(err)}`,
+        error: `Απέτυχε η αποστολή για ${locale}${wooId ? ` (#${wooId})` : ''}: ${err instanceof Error ? err.message : String(err)}`,
         reports,
       }
     }
 
-    // Read back from the store, not from the PUT response.
-    const live = await readBack('products', wooId)
-    const verdicts = verifyFields(plan.body, live)
-    reports.push({ locale, wooId, verdicts, ok: verdicts.every(v => v.match) })
+    let id = wooId
+    if (plan.method === 'POST') {
+      id = Number(response.id ?? 0)
+      if (!id) {
+        return { ok: false, error: `Το WooCommerce δεν επέστρεψε id για τη γλώσσα ${locale}.`, reports }
+      }
+      // Recorded immediately: if a later language fails, the product must not
+      // be created a second time on the next attempt.
+      await prisma.productTranslation.update({
+        where: { productId_locale: { productId, locale } },
+        data: { wooId: id },
+      })
+      created.set(locale, id)
+    }
+
+    // Read back from the store, not from the response, which merely echoes.
+    const live = await readBack('products', id)
+    const verdicts = verifyFields(body, live)
+    reports.push({ locale, wooId: id, verdicts, ok: verdicts.every(v => v.match) })
   }
 
   revalidatePath(`/products/${productId}`)

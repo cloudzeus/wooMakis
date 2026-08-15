@@ -45,8 +45,9 @@ const FIELDS_FOR: Record<WooResource, readonly string[]> = {
 }
 
 export type WritePlan = {
-  method: 'PUT'
+  method: 'PUT' | 'POST'
   resource: WooResource
+  /** 0 for a create — there is no id until the store assigns one. */
   wooId: number
   url: string
   body: Record<string, unknown>
@@ -83,6 +84,29 @@ export function planUpdate(
   }
 }
 
+/**
+ * Builds a create. Same three gates as an update — a POST to a live store is
+ * not less dangerous than a PUT, it is more so: a failed update leaves a
+ * wrong value, a failed create leaves an orphan post nobody is looking for.
+ */
+export function planCreate(
+  resource: WooResource,
+  body: Record<string, unknown>,
+  confirmed = false,
+): WritePlan {
+  const gate = readGate()
+  const { baseUrl } = config()
+  return {
+    method: 'POST',
+    resource,
+    wooId: 0,
+    url: `${baseUrl}/wp-json/wc/v3/${resource}`,
+    body,
+    gate,
+    wouldExecute: gate.allowWrites && !gate.dryRun && confirmed,
+  }
+}
+
 /** Kept as the product-shaped entry point most callers use. */
 export function planProductUpdate(
   wooId: number,
@@ -111,7 +135,7 @@ export async function executeUpdate(plan: WritePlan): Promise<Record<string, unk
   url.searchParams.set('_fields', fieldParam(FIELDS_FOR[plan.resource]))
 
   const res = await fetch(url.toString(), {
-    method: 'PUT',
+    method: plan.method,
     headers: { authorization: auth, 'content-type': 'application/json' },
     body: JSON.stringify(plan.body),
     cache: 'no-store',
