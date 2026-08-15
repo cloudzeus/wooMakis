@@ -10,9 +10,10 @@ export default async function ProductsPage() {
   const products = await prisma.product.findMany({
     orderBy: { menuOrder: 'asc' },
     include: {
-      translations: true,
+      translations: { orderBy: { locale: 'asc' } },
       categories: { include: { category: { include: { translations: true } } } },
       images: { include: { asset: true }, orderBy: { position: 'asc' } },
+      _count: { select: { variations: true } },
     },
   })
 
@@ -25,12 +26,17 @@ export default async function ProductsPage() {
       sku: p.sku,
       type: p.type,
       status: p.status,
+      featured: p.featured,
       price: p.price?.toString() ?? null,
       regularPrice: p.regularPrice?.toString() ?? null,
       onSale: p.onSale,
+      manageStock: p.manageStock,
       stockStatus: p.stockStatus,
       stockQuantity: p.stockQuantity,
+      menuOrder: p.menuOrder,
       totalSales: p.totalSales,
+      createdAt: p.createdAt.toISOString(),
+      updatedAt: p.updatedAt.toISOString(),
       nameEl: el?.name ?? null,
       nameEn: en?.name ?? null,
       slugEl: el?.slug ?? null,
@@ -42,6 +48,25 @@ export default async function ProductsPage() {
         .filter(Boolean),
       thumbUrl: p.images[0]?.asset.cdnUrl ?? null,
       imageCount: p.images.length,
+      images: p.images.map(pi => ({
+        assetId: pi.asset.id,
+        cdnUrl: pi.asset.cdnUrl,
+        mimeType: pi.asset.mimeType,
+        bytes: pi.asset.bytes,
+        width: pi.asset.width,
+        height: pi.asset.height,
+      })),
+      translations: p.translations.map(t => ({
+        locale: t.locale,
+        wooId: t.wooId,
+        name: t.name,
+        slug: t.slug,
+        shortDescription: t.shortDescription,
+        description: t.description,
+        permalink: t.permalink,
+        wooModifiedAt: t.wooModifiedAt?.toISOString() ?? null,
+      })),
+      variationCount: p._count.variations,
     }
   })
 

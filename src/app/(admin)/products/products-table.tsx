@@ -6,18 +6,34 @@ import { useMemo } from 'react'
 import type { ColumnDef } from '@tanstack/react-table'
 import { DataTable } from '@/components/data-table'
 
+export type ProductTranslationDetail = {
+  locale: string
+  wooId: number
+  name: string
+  slug: string
+  shortDescription: string | null
+  description: string | null
+  permalink: string | null
+  wooModifiedAt: string | null
+}
+
 export type ProductRow = {
   id: string
   wooGroupKey: number
   sku: string | null
   type: string
   status: string
+  featured: boolean
   price: string | null
   regularPrice: string | null
   onSale: boolean
+  manageStock: boolean
   stockStatus: string
   stockQuantity: number | null
+  menuOrder: number
   totalSales: number
+  createdAt: string
+  updatedAt: string
   nameEl: string | null
   nameEn: string | null
   slugEl: string | null
@@ -26,6 +42,9 @@ export type ProductRow = {
   categories: string[]
   thumbUrl: string | null
   imageCount: number
+  images: { assetId: string; cdnUrl: string; mimeType: string; bytes: number; width: number | null; height: number | null }[]
+  translations: ProductTranslationDetail[]
+  variationCount: number
 }
 
 function Money({ value }: { value: string | null }) {
@@ -148,27 +167,7 @@ export function ProductsTable({ rows }: { rows: ProductRow[] }) {
       data={rows}
       searchPlaceholder="Αναζήτηση προϊόντος, SKU…"
       emptyMessage="Δεν υπάρχουν προϊόντα. Τρέξε συγχρονισμό για να τα κατεβάσεις από το WooCommerce."
-      renderDetail={row => (
-        <div className="grid gap-x-8 gap-y-2 text-[13px] sm:grid-cols-2 lg:grid-cols-3">
-          <Field label="Woo group key" value={String(row.wooGroupKey)} />
-          <Field label="Slug (el)" value={row.slugEl ?? '—'} />
-          <Field label="Κατηγορίες" value={row.categories.length ? row.categories.join(', ') : '—'} />
-          <Field label="Εικόνες" value={String(row.imageCount)} />
-          <Field label="Κανονική τιμή" value={row.regularPrice ? `${Number(row.regularPrice).toFixed(2)} €` : '—'} />
-          <Field label="Σε προσφορά" value={row.onSale ? 'Ναι' : 'Όχι'} />
-          {row.permalinkEl && (
-            <div className="sm:col-span-2 lg:col-span-3">
-              <span className="text-xs uppercase tracking-wide text-muted-foreground">Στο mylens.gr</span>
-              <div>
-                <a href={row.permalinkEl} target="_blank" rel="noopener noreferrer"
-                   className="text-[var(--info)] underline underline-offset-2">
-                  {row.permalinkEl}
-                </a>
-              </div>
-            </div>
-          )}
-        </div>
-      )}
+      renderDetail={row => <ProductDetail row={row} />}
     />
   )
 }
@@ -178,6 +177,128 @@ function Field({ label, value }: { label: string; value: string }) {
     <div>
       <span className="text-xs uppercase tracking-wide text-muted-foreground">{label}</span>
       <div>{value}</div>
+    </div>
+  )
+}
+
+/** Strips WooCommerce's HTML so descriptions read as text in a table row. */
+function plain(html: string | null): string {
+  if (!html) return '—'
+  return html.replace(/<[^>]*>/g, ' ').replace(/&nbsp;/g, ' ').replace(/\s+/g, ' ').trim() || '—'
+}
+
+function fmtDate(iso: string | null): string {
+  if (!iso) return '—'
+  const d = new Date(iso)
+  return Number.isNaN(d.getTime()) ? '—' : d.toLocaleString('el-GR')
+}
+
+function ProductDetail({ row }: { row: ProductRow }) {
+  return (
+    <div className="space-y-5">
+      <div className="flex flex-wrap items-center gap-2">
+        <Link
+          href={`/products/${row.id}`}
+          className="rounded-full bg-primary px-4 py-1.5 text-xs font-medium text-primary-foreground"
+        >
+          Επεξεργασία προϊόντος
+        </Link>
+        {row.permalinkEl && (
+          <a href={row.permalinkEl} target="_blank" rel="noopener noreferrer"
+             className="rounded-full border border-border px-4 py-1.5 text-xs hover:bg-accent">
+            Άνοιγμα στο mylens.gr ↗
+          </a>
+        )}
+      </div>
+
+      <div>
+        <h4 className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+          Γενικά στοιχεία
+        </h4>
+        <div className="grid gap-x-8 gap-y-2 sm:grid-cols-3 lg:grid-cols-5">
+          <Field label="Woo group key" value={String(row.wooGroupKey)} />
+          <Field label="SKU" value={row.sku ?? '—'} />
+          <Field label="Τύπος" value={row.type} />
+          <Field label="Κατάσταση" value={row.status} />
+          <Field label="Προβεβλημένο" value={row.featured ? 'Ναι' : 'Όχι'} />
+          <Field label="Τιμή" value={row.price ? `${Number(row.price).toFixed(2)} €` : '—'} />
+          <Field label="Κανονική τιμή" value={row.regularPrice ? `${Number(row.regularPrice).toFixed(2)} €` : '—'} />
+          <Field label="Σε προσφορά" value={row.onSale ? 'Ναι' : 'Όχι'} />
+          <Field label="Διαχείριση αποθέματος" value={row.manageStock ? 'Ναι' : 'Όχι'} />
+          <Field label="Απόθεμα" value={`${row.stockStatus}${row.stockQuantity !== null ? ` (${row.stockQuantity})` : ''}`} />
+          <Field label="Σειρά" value={String(row.menuOrder)} />
+          <Field label="Πωλήσεις" value={String(row.totalSales)} />
+          <Field label="Παραλλαγές" value={String(row.variationCount)} />
+          <Field label="Κατηγορίες" value={row.categories.length ? row.categories.join(', ') : '—'} />
+          <Field label="Τοπικά ενημερώθηκε" value={fmtDate(row.updatedAt)} />
+        </div>
+      </div>
+
+      <div>
+        <h4 className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+          Μεταφράσεις ({row.translations.length})
+        </h4>
+        <div className="grid gap-3 lg:grid-cols-2">
+          {row.translations.map(t => (
+            <div key={t.locale} className="rounded-xl border border-border bg-card p-3">
+              <div className="mb-2 flex items-center gap-2">
+                <span className="rounded-full bg-[var(--navy)]/10 px-2 py-0.5 text-[11px] uppercase text-[var(--navy)]">
+                  {t.locale}
+                </span>
+                <span className="text-xs text-muted-foreground">Woo #{t.wooId}</span>
+                <span className="ml-auto text-xs text-muted-foreground">
+                  Woo: {fmtDate(t.wooModifiedAt)}
+                </span>
+              </div>
+              <div className="space-y-1.5">
+                <Field label="Όνομα" value={t.name} />
+                <Field label="Slug" value={t.slug} />
+                <div>
+                  <span className="text-xs uppercase tracking-wide text-muted-foreground">Σύντομη περιγραφή</span>
+                  <p className="text-muted-foreground">{plain(t.shortDescription)}</p>
+                </div>
+                <div>
+                  <span className="text-xs uppercase tracking-wide text-muted-foreground">Περιγραφή</span>
+                  <p className="line-clamp-4 text-muted-foreground">{plain(t.description)}</p>
+                </div>
+              </div>
+            </div>
+          ))}
+          {row.translations.length < 2 && (
+            <div className="rounded-xl border border-dashed border-[var(--warning)]/40 bg-[var(--warning)]/5 p-3 text-sm text-[var(--warning)]">
+              ⚠ Λείπει μετάφραση — το προϊόν υπάρχει μόνο στα «{row.translations[0]?.locale}».
+            </div>
+          )}
+        </div>
+      </div>
+
+      <div>
+        <h4 className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+          Εικόνες ({row.imageCount})
+        </h4>
+        {row.images.length === 0 ? (
+          <p className="text-sm text-muted-foreground">Καμία εικόνα.</p>
+        ) : (
+          <ul className="flex flex-wrap gap-2">
+            {row.images.map(img => (
+              <li key={img.assetId} className="w-28">
+                <Image
+                  src={img.cdnUrl}
+                  alt=""
+                  width={112}
+                  height={112}
+                  className="aspect-square w-full rounded-[10px] border border-border object-cover"
+                  unoptimized
+                />
+                <div className="mt-1 text-[10px] text-muted-foreground">
+                  {img.mimeType.replace('image/', '').toUpperCase()} · {Math.round(img.bytes / 1024)} KB
+                  {img.width && img.height && <><br />{img.width}×{img.height}</>}
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
     </div>
   )
 }

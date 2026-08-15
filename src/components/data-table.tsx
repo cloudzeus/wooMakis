@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { Fragment, useState } from 'react'
 import {
   type ColumnDef,
   type SortingState,
@@ -43,7 +43,9 @@ export function DataTable<T>({
   const [globalFilter, setGlobalFilter] = useState('')
   const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({})
   const [showColumns, setShowColumns] = useState(false)
-  const [expanded, setExpanded] = useState<number | null>(null)
+  // Keyed by row id, not index — an index survives sorting and paging as the
+  // *wrong* row, silently expanding whatever now sits in that position.
+  const [expanded, setExpanded] = useState<string | null>(null)
 
   const table = useReactTable({
     data,
@@ -147,40 +149,49 @@ export function DataTable<T>({
                 </td>
               </tr>
             )}
-            {table.getRowModel().rows.map((row, i) => (
-              <tr key={row.id} className="h-10 border-b border-border/60 last:border-0 hover:bg-accent/40">
-                {renderDetail && (
-                  <td className="px-2">
-                    <button
-                      type="button"
-                      onClick={() => setExpanded(expanded === i ? null : i)}
-                      aria-expanded={expanded === i}
-                      aria-label={expanded === i ? 'Σύμπτυξη' : 'Ανάπτυξη'}
-                      className="cursor-pointer px-1 text-muted-foreground hover:text-foreground"
-                    >
-                      {expanded === i ? '▾' : '▸'}
-                    </button>
-                  </td>
-                )}
-                {row.getVisibleCells().map(cell => (
-                  <td key={cell.id} className="px-3 py-1.5">
-                    {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                  </td>
-                ))}
-              </tr>
-            ))}
-            {renderDetail &&
-              expanded !== null &&
-              table.getRowModel().rows[expanded] && (
-                <tr>
-                  <td
-                    colSpan={table.getAllLeafColumns().length + 1}
-                    className="bg-muted/50 px-5 py-4"
+            {table.getRowModel().rows.map(row => {
+              const isOpen = expanded === row.id
+              return (
+                // Fragment keeps the detail row adjacent to its own row. Emitting
+                // it after the map put every expansion at the bottom of the table.
+                <Fragment key={row.id}>
+                  <tr
+                    className={`h-10 border-b border-border/60 hover:bg-accent/40 ${
+                      isOpen ? 'bg-accent/30' : ''
+                    }`}
                   >
-                    {renderDetail(table.getRowModel().rows[expanded].original)}
-                  </td>
-                </tr>
-              )}
+                    {renderDetail && (
+                      <td className="px-2">
+                        <button
+                          type="button"
+                          onClick={() => setExpanded(isOpen ? null : row.id)}
+                          aria-expanded={isOpen}
+                          aria-label={isOpen ? 'Σύμπτυξη' : 'Ανάπτυξη'}
+                          className="cursor-pointer px-1 text-muted-foreground hover:text-foreground"
+                        >
+                          {isOpen ? '▾' : '▸'}
+                        </button>
+                      </td>
+                    )}
+                    {row.getVisibleCells().map(cell => (
+                      <td key={cell.id} className="px-3 py-1.5">
+                        {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                      </td>
+                    ))}
+                  </tr>
+                  {renderDetail && isOpen && (
+                    <tr>
+                      <td
+                        colSpan={row.getVisibleCells().length + 1}
+                        className="border-b border-border bg-muted/50 px-5 py-4"
+                      >
+                        {renderDetail(row.original)}
+                      </td>
+                    </tr>
+                  )}
+                </Fragment>
+              )
+            })}
           </tbody>
         </table>
       </div>
