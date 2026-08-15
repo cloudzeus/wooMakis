@@ -174,15 +174,21 @@ export default defineConfig({
 ```prisma
 // prisma/schema.prisma
 generator client {
-  provider        = "prisma-client-js"
-  previewFeatures = ["driverAdapters"]
+  provider = "prisma-client-js"
 }
 
+// Prisma 7 removed `url` from the datasource block. Migrate/CLI reads the
+// connection string from prisma.config.ts; the runtime client gets it from the
+// PrismaPg adapter in src/lib/prisma.ts. Do not re-add `url` here — it is a
+// hard P1012 error, not a warning.
 datasource db {
   provider = "postgresql"
-  url      = env("DATABASE_URL")
 }
 ```
+
+Two Prisma 7 changes from older guides: `url` in the datasource block is a hard
+`P1012` error, and `previewFeatures = ["driverAdapters"]` is deprecated — driver
+adapters work without it.
 
 - [ ] **Step 3: Write the client singleton**
 
