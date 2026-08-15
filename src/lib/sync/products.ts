@@ -107,7 +107,17 @@ export function toProductUpserts(posts: WooProduct[]): ProductUpsert[] {
   })
 }
 
-export type ProductPullResult = { created: number; updated: number; imageUrls: string[] }
+export type ProductPullResult = {
+  created: number
+  updated: number
+  imageUrls: string[]
+  /**
+   * productId → its image source urls, in Woo's own order. Kept because the
+   * MediaAsset rows do not exist until mirroring has run, so the product↔asset
+   * links can only be written afterwards (see linkProductImages).
+   */
+  imagesByProduct: Map<string, { src: string; alt: string | null }[]>
+}
 
 export async function pullProducts(): Promise<ProductPullResult> {
   const posts = await listProducts()
@@ -115,6 +125,7 @@ export async function pullProducts(): Promise<ProductPullResult> {
   let created = 0
   let updated = 0
   const imageUrls: string[] = []
+  const imagesByProduct = new Map<string, { src: string; alt: string | null }[]>()
 
   for (const row of upserts) {
     const existing = await prisma.product.findUnique({ where: { wooGroupKey: row.wooGroupKey } })
@@ -168,7 +179,46 @@ export async function pullProducts(): Promise<ProductPullResult> {
     }
 
     imageUrls.push(...row.images.map(i => i.src))
+    imagesByProduct.set(product.id, row.images.map(i => ({ src: i.src, alt: i.alt || null })))
   }
 
-  return { created, updated, imageUrls: [...new Set(imageUrls)] }
+  return { created, updated, imageUrls: [...new Set(imageUrls)], imagesByProduct }
+}
+
+/**
+ * Writes the ProductImage join rows. Must run AFTER mirrorImages, because it
+ * resolves each Woo source url to the MediaAsset created during mirroring.
+ * Images that failed to mirror are simply skipped — the product keeps whatever
+ * links it already had rather than losing them.
+ */
+export async function linkProductImages(
+  imagesByProduct: Map<string, { src: string; alt: string | null }[]>,
+): Promise<{ linked: number; unresolved: number }> {
+  const allSrcs = [...new Set([...imagesByProduct.values()].flat().map(i => i.src))]
+  const assets = await prisma.mediaAsset.findMany({
+    where: { sourceUrl: { in: allSrcs } },
+    select: { id: true, sourceUrl: true },
+  })
+  const assetIdBySrc = new Map(assets.map(a => [a.sourceUrl, a.id]))
+
+  let linked = 0
+  let unresolved = 0
+
+  for (const [productId, images] of imagesByProduct) {
+    const rows = images
+      .map((img, position) => {
+        const assetId = assetIdBySrc.get(img.src)
+        if (!assetId) { unresolved++; return null }
+        return { productId, assetId, position, alt: img.alt }
+      })
+      .filter((r): r is NonNullable<typeof r> => r !== null)
+
+    if (!rows.length) continue
+
+    await prisma.productImage.deleteMany({ where: { productId } })
+    await prisma.productImage.createMany({ data: rows, skipDuplicates: true })
+    linked += rows.length
+  }
+
+  return { linked, unresolved }
 }

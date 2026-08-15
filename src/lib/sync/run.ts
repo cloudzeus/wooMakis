@@ -1,12 +1,13 @@
 import { prisma } from '@/lib/prisma'
 import { pullCategories } from '@/lib/sync/categories'
-import { pullProducts } from '@/lib/sync/products'
+import { linkProductImages, pullProducts } from '@/lib/sync/products'
 import { mirrorImages } from '@/lib/sync/mirror'
 
 export type FullPullResult = {
   categories: { created: number; updated: number }
   products: { created: number; updated: number }
   images: { mirrored: number; skipped: number; failed: number }
+  links: { linked: number; unresolved: number }
 }
 
 /** Categories first — products reference them when building category links. */
@@ -23,6 +24,10 @@ export async function runFullPull({ withImages = true } = {}): Promise<FullPullR
       ? await mirrorImages(products.imageUrls)
       : { mirrored: 0, skipped: 0, failed: 0 }
 
+    // Always relink, even when mirroring was skipped — assets from an earlier
+    // run are already present and the products still need their links.
+    const links = await linkProductImages(products.imagesByProduct)
+
     await prisma.syncLog.update({
       where: { id: log.id },
       data: {
@@ -34,7 +39,7 @@ export async function runFullPull({ withImages = true } = {}): Promise<FullPullR
         failed: images.failed,
       },
     })
-    return { categories, products, images }
+    return { categories, products, images, links }
   } catch (err) {
     await prisma.syncLog.update({
       where: { id: log.id },
