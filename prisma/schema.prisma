@@ -439,7 +439,8 @@ model Customer {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  orders Order[]
+  orders  Order[]
+  account CustomerAccount?
 
   @@index([source])
   @@index([EMAIL])
@@ -523,4 +524,96 @@ model OrderLine {
 
   @@unique([orderId, wooLineId])
   @@index([productId])
+}
+
+// ── Storefront content ───────────────────────────────────
+// Pages and FAQ entries that exist only here. They are not mirrored from
+// WooCommerce: the legal text belongs to this storefront, and keeping it in
+// the database rather than in the code means it can be corrected without a
+// deployment, which is what "εντός 30 ημερών" clauses eventually require.
+
+enum ContentKind {
+  TERMS
+  PRIVACY
+  COOKIES
+  SHIPPING
+  RETURNS
+  GENERIC
+}
+
+model ContentPage {
+  id        String      @id @default(cuid())
+  /// URL segment, e.g. "oroi-chrisis". Shared across languages so a link keeps
+  /// working when the visitor switches language.
+  slug      String      @unique
+  kind      ContentKind @default(GENERIC)
+  published Boolean     @default(true)
+  menuOrder Int         @default(0)
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
+
+  translations ContentPageTranslation[]
+
+  @@index([kind])
+}
+
+model ContentPageTranslation {
+  pageId  String
+  locale  String
+  title   String
+  /// Plain text with blank-line paragraphs and "## " headings. Deliberately
+  /// not HTML: this is edited by staff, and accepting HTML from a textarea
+  /// means accepting script injection into every visitor's page.
+  body    String
+  summary String?
+
+  page ContentPage @relation(fields: [pageId], references: [id], onDelete: Cascade)
+
+  @@id([pageId, locale])
+}
+
+model FaqItem {
+  id        String   @id @default(cuid())
+  /// Free-text grouping, e.g. "Παραγγελίες", "Φακοί". Used as the section
+  /// heading on the public page.
+  category  String   @default("general")
+  menuOrder Int      @default(0)
+  published Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  translations FaqTranslation[]
+
+  @@index([category, menuOrder])
+}
+
+model FaqTranslation {
+  faqId    String
+  locale   String
+  question String
+  answer   String
+
+  faq FaqItem @relation(fields: [faqId], references: [id], onDelete: Cascade)
+
+  @@id([faqId, locale])
+}
+
+// ── Customer storefront accounts ─────────────────────────
+// Separate from User, which is staff-only. A customer signing in here is not
+// signing in to WooCommerce: WordPress password hashes cannot be verified
+// through the REST API, so an existing customer sets a password here the first
+// time and it is matched to their history by email.
+
+model CustomerAccount {
+  id         String   @id @default(cuid())
+  customerId String   @unique
+  customer   Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  email        String  @unique
+  passwordHash String
+  active       Boolean @default(true)
+
+  lastLoginAt DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
 }

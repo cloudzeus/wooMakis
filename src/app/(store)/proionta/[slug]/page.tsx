@@ -4,6 +4,8 @@ import { notFound } from 'next/navigation'
 import { prisma } from '@/lib/prisma'
 import { readCartCount } from '@/lib/cart'
 import { StoreFooter, StoreHeader } from '@/components/store/store-header'
+import { getT } from '@/lib/locale-server'
+import { getCustomerSession } from '@/lib/customer-auth'
 import { CANVAS, INK, INK_MUTED, TEAL_DEEP } from '@/components/store/tokens'
 import type { StoreProduct } from '@/components/store/types'
 import { ProductView } from './product-view'
@@ -78,6 +80,9 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
 }
 
 export default async function ProductPage({ params }: { params: Promise<{ slug: string }> }) {
+  const { locale } = await getT()
+  const customer = await getCustomerSession()
+
   const { slug } = await params
   const row = await loadBySlug(decodeURIComponent(slug))
   if (!row) notFound()
@@ -133,7 +138,7 @@ export default async function ProductPage({ params }: { params: Promise<{ slug: 
 
   return (
     <div className="min-h-dvh font-store" style={{ background: CANVAS }}>
-      <StoreHeader cartCount={cartCount} />
+      <StoreHeader cartCount={cartCount} locale={locale} customerName={customer?.name} />
 
       <main className="mx-auto max-w-[1440px] px-5 pb-24 pt-6 sm:px-8">
         <nav aria-label="Διαδρομή" className="mb-5 flex flex-wrap items-center gap-1.5 text-[13px]">
@@ -159,7 +164,7 @@ export default async function ProductPage({ params }: { params: Promise<{ slug: 
         <ProductView product={product} related={related} />
       </main>
 
-      <StoreFooter />
+      <StoreFooter locale={locale} />
     </div>
   )
 }

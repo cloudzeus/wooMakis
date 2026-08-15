@@ -3,6 +3,8 @@ import Link from 'next/link'
 import { prisma } from '@/lib/prisma'
 import { readCartCount } from '@/lib/cart'
 import { StoreFooter, StoreHeader } from '@/components/store/store-header'
+import { getT } from '@/lib/locale-server'
+import { getCustomerSession } from '@/lib/customer-auth'
 import { HomeShowcase } from './home-showcase'
 import { HeroMotion } from '@/components/store/hero-motion'
 import { Marquee } from '@/components/store/marquee'
@@ -22,6 +24,9 @@ export const dynamic = 'force-dynamic'
 type WooAttribute = { name?: string; options?: string[] }
 
 export default async function HomePage() {
+  const { locale } = await getT()
+  const customer = await getCustomerSession()
+
   const [rows, categories, productCount, cartCount, brands, slotAssets, bannerRows] = await Promise.all([
     prisma.product.findMany({
       where: { status: 'publish', images: { some: {} } },
@@ -129,7 +134,7 @@ export default async function HomePage() {
 
   return (
     <div className="min-h-dvh font-store" style={{ background: CANVAS }}>
-      <StoreHeader cartCount={cartCount} />
+      <StoreHeader cartCount={cartCount} locale={locale} customerName={customer?.name} />
 
       <main className="mx-auto max-w-[1440px] px-5 pb-24 pt-5 sm:px-8">
         {/* ── Hero bento: 7/5 split, staggered heights for rhythm ── */}
@@ -314,7 +319,7 @@ export default async function HomePage() {
         </section>
       </main>
 
-      <StoreFooter />
+      <StoreFooter locale={locale} />
     </div>
   )
 }

@@ -1,7 +1,7 @@
 'use client'
 
 import { Fragment, useMemo, useState, useTransition } from 'react'
-import { addLinesToCart } from '@/app/kalathi/actions'
+import { addLinesToCart } from '@/app/(store)/kalathi/actions'
 import { CheckCircle, ICON_SM, Minus, Plus, WarningCircle } from './icons'
 import { EYE_SHORT, attrLabel, defaultSelections, eyeAttrKey, splitAttributes } from '@/lib/lens-attributes'
 import { CREAM, HAIRLINE, INK, INK_FAINT, INK_MUTED, SURFACE, TEAL, TEAL_DEEP } from './tokens'

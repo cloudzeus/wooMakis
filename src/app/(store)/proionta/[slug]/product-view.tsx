@@ -3,7 +3,7 @@
 import Image from 'next/image'
 import Link from 'next/link'
 import { useState, useTransition } from 'react'
-import { addToCart } from '@/app/kalathi/actions'
+import { addToCart } from '@/app/(store)/kalathi/actions'
 import { EyePicker } from '@/components/store/eye-picker'
 import { needsSelection } from '@/lib/lens-attributes'
 import { ProductCard } from '@/components/store/product-card'

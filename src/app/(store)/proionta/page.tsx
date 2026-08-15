@@ -2,6 +2,8 @@ import type { Metadata } from 'next'
 import { prisma } from '@/lib/prisma'
 import { readCartCount } from '@/lib/cart'
 import { StoreFooter, StoreHeader } from '@/components/store/store-header'
+import { getT } from '@/lib/locale-server'
+import { getCustomerSession } from '@/lib/customer-auth'
 import { CANVAS, INK, INK_MUTED, TEAL_DEEP } from '@/components/store/tokens'
 import type { StoreProduct } from '@/components/store/types'
 import { Catalog } from './catalog'
@@ -16,6 +18,9 @@ export const metadata: Metadata = {
 type WooAttribute = { name?: string; options?: string[] }
 
 export default async function ProductsPage() {
+  const { locale } = await getT()
+  const customer = await getCustomerSession()
+
   const [rows, cartCount] = await Promise.all([
     prisma.product.findMany({
       where: { status: 'publish' },
@@ -75,7 +80,7 @@ export default async function ProductsPage() {
 
   return (
     <div className="min-h-dvh font-store" style={{ background: CANVAS }}>
-      <StoreHeader cartCount={cartCount} />
+      <StoreHeader cartCount={cartCount} locale={locale} customerName={customer?.name} />
 
       <main className="mx-auto max-w-[1440px] px-5 pb-24 pt-10 sm:px-8">
         <div className="mb-8">
@@ -94,7 +99,7 @@ export default async function ProductsPage() {
         <Catalog products={products} categories={categories} brands={brands} />
       </main>
 
-      <StoreFooter />
+      <StoreFooter locale={locale} />
     </div>
   )
 }

@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useTransition } from 'react'
-import { addToCart } from '@/app/kalathi/actions'
+import { addToCart } from '@/app/(store)/kalathi/actions'
 
 export function AddToCart({ productId, disabled }: { productId: string; disabled?: boolean }) {
   const [pending, start] = useTransition()

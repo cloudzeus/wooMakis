@@ -3,7 +3,7 @@
 import Image from 'next/image'
 import Link from 'next/link'
 import { useEffect, useRef, useState, useTransition } from 'react'
-import { addToCart } from '@/app/kalathi/actions'
+import { addToCart } from '@/app/(store)/kalathi/actions'
 import { ICON_MD, ICON_SM, CheckCircle, Minus, Plus, WarningCircle, X, ArrowUpRight } from './icons'
 import { CREAM, INK, INK_FAINT, INK_MUTED, R_CARD, R_INNER, SURFACE, SURFACE_PRODUCT, TEAL, TEAL_DEEP } from './tokens'
 import type { StoreProduct } from './types'
