@@ -1,7 +1,7 @@
 import { prisma } from '@/lib/prisma'
-import { listProducts } from '@/lib/woo/client'
+import { listProducts, listVariations } from '@/lib/woo/client'
 import { groupByTranslation } from '@/lib/woo/translation-groups'
-import type { WooImage, WooProduct } from '@/lib/woo/types'
+import type { WooImage, WooProduct, WooProductAttribute } from '@/lib/woo/types'
 
 /**
  * Woo's `sale_price` and `on_sale` cannot be read — requesting either returns
@@ -51,6 +51,8 @@ export type ProductUpsert = {
   menuOrder: number
   totalSales: number
   categoryWooIds: number[]
+  brandWooIds: number[]
+  attributes: WooProductAttribute[]
   images: WooImage[]
   variationWooIds: number[]
   translations: ProductTranslationUpsert[]
@@ -73,6 +75,7 @@ export function toProductUpserts(posts: WooProduct[]): ProductUpsert[] {
     }
 
     const categoryWooIds = [...new Set(locales.flatMap(([, p]) => (p.categories ?? []).map(c => c.id)))]
+    const brandWooIds = [...new Set(locales.flatMap(([, p]) => (p.brands ?? []).map(b => b.id)))]
     const variationWooIds = [...new Set(locales.flatMap(([, p]) => p.variations ?? []))]
 
     return {
@@ -90,6 +93,9 @@ export function toProductUpserts(posts: WooProduct[]): ProductUpsert[] {
       menuOrder: toInt(canonical.menu_order),
       totalSales: toInt(canonical.total_sales),
       categoryWooIds,
+      brandWooIds,
+      // Language-neutral: option values are shared across translations.
+      attributes: canonical.attributes ?? [],
       images,
       variationWooIds,
       translations: locales.map(([locale, post]) => ({
@@ -136,9 +142,11 @@ export async function pullProducts(): Promise<ProductPullResult> {
         price: row.price, regularPrice: row.regularPrice, onSale: row.onSale,
         manageStock: row.manageStock, stockQuantity: row.stockQuantity,
         stockStatus: row.stockStatus, menuOrder: row.menuOrder, totalSales: row.totalSales,
+        attributes: row.attributes as object,
       },
       create: {
         wooGroupKey: row.wooGroupKey,
+        attributes: row.attributes as object,
         sku: row.sku, type: row.type, status: row.status, featured: row.featured,
         price: row.price, regularPrice: row.regularPrice, onSale: row.onSale,
         manageStock: row.manageStock, stockQuantity: row.stockQuantity,
@@ -176,6 +184,50 @@ export async function pullProducts(): Promise<ProductPullResult> {
         data: categories.map(c => ({ productId: product.id, categoryId: c.id })),
         skipDuplicates: true,
       })
+    }
+
+    // Brand links — same replace-wholesale approach as categories.
+    if (row.brandWooIds.length) {
+      const brands = await prisma.brand.findMany({
+        where: { translations: { some: { wooId: { in: row.brandWooIds } } } },
+        select: { id: true },
+      })
+      await prisma.productBrand.deleteMany({ where: { productId: product.id } })
+      if (brands.length) {
+        await prisma.productBrand.createMany({
+          data: brands.map(b => ({ productId: product.id, brandId: b.id })),
+          skipDuplicates: true,
+        })
+      }
+    }
+
+    // Variations. Fetched per product because Woo has no bulk endpoint for
+    // them; only variable products have any, so simple products cost nothing.
+    //
+    // Variations hang off a specific POST, not off the translation group, so the
+    // parent id is a translation's wooId — Greek by preference, since that is
+    // the language the catalogue is authored in.
+    const variationParentWooId =
+      row.translations.find(t => t.locale === 'el')?.wooId ?? row.translations[0]?.wooId
+    if (row.variationWooIds.length && variationParentWooId) {
+      const variations = await listVariations(variationParentWooId)
+      for (const v of variations) {
+        await prisma.productVariation.upsert({
+          where: { wooId: v.id },
+          update: {
+            productId: product.id, sku: v.sku || null,
+            price: v.price || null, regularPrice: v.regular_price || null,
+            stockQuantity: v.stock_quantity, stockStatus: v.stock_status,
+            menuOrder: v.menu_order, attributes: (v.attributes ?? []) as object,
+          },
+          create: {
+            productId: product.id, wooId: v.id, sku: v.sku || null,
+            price: v.price || null, regularPrice: v.regular_price || null,
+            stockQuantity: v.stock_quantity, stockStatus: v.stock_status,
+            menuOrder: v.menu_order, attributes: (v.attributes ?? []) as object,
+          },
+        })
+      }
     }
 
     imageUrls.push(...row.images.map(i => i.src))

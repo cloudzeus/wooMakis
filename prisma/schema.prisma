@@ -113,11 +113,18 @@ model Product {
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
+  /// The parent's attribute definitions exactly as WooCommerce returns them:
+  /// [{id, name, slug, position, visible, variation, options[]}]. Stored as
+  /// JSON rather than normalised because the set is per-product, read whole,
+  /// and never queried by individual option.
+  attributes    Json?
+
   translations ProductTranslation[]
   variations   ProductVariation[]
   categories   ProductCategory[]
   images       ProductImage[]
   cartLines    CartLine[]
+  brands       ProductBrand[]
 
   @@index([type])
   @@index([status])
@@ -274,4 +281,46 @@ model CartLine {
 
   @@unique([cartId, productId])
   @@index([cartId])
+}
+
+// ── Brands ───────────────────────────────────────────────
+// WooCommerce exposes these at products/brands. Polylang duplicates them per
+// language exactly like categories, so the same translation-group collapsing
+// applies: 44 posts are ~22 real brands.
+
+model Brand {
+  id          String   @id @default(cuid())
+  wooGroupKey Int      @unique
+  count       Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  translations BrandTranslation[]
+  products     ProductBrand[]
+}
+
+model BrandTranslation {
+  brandId     String
+  locale      String
+  wooId       Int     @unique
+  wooSnapshot Json?
+  name        String
+  slug        String
+  description String?
+
+  brand Brand @relation(fields: [brandId], references: [id], onDelete: Cascade)
+
+  @@id([brandId, locale])
+  @@index([slug])
+}
+
+model ProductBrand {
+  productId String
+  brandId   String
+
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  brand   Brand   @relation(fields: [brandId], references: [id], onDelete: Cascade)
+
+  @@id([productId, brandId])
+  @@index([brandId])
 }

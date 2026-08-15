@@ -21,6 +21,26 @@ export type WooCategory = {
   count: number
 }
 
+export type WooBrand = {
+  id: number
+  lang: string
+  translations: WooTranslations
+  name: string
+  slug: string
+  description: string
+  count: number
+}
+
+export type WooProductAttribute = {
+  id: number
+  name: string
+  slug?: string
+  position?: number
+  visible?: boolean
+  variation?: boolean
+  options?: string[]
+}
+
 export type WooProduct = {
   id: number
   lang: string
@@ -42,7 +62,8 @@ export type WooProduct = {
   categories: WooTermRef[]
   tags: WooTermRef[]
   images: WooImage[]
-  attributes: unknown[]
+  attributes: WooProductAttribute[]
+  brands?: WooTermRef[]
   variations: number[]
   menu_order: number
   /** The live site returns this as a string ("0") for some posts, a number for others. */
@@ -51,6 +72,8 @@ export type WooProduct = {
   date_modified: string
 }
 
+export type WooVariationAttribute = { id: number; name: string; slug?: string; option: string }
+
 export type WooVariation = {
   id: number
   sku: string
@@ -58,7 +81,7 @@ export type WooVariation = {
   regular_price: string
   stock_quantity: number | null
   stock_status: string
-  attributes: unknown[]
+  attributes: WooVariationAttribute[]
   image: WooImage | null
   menu_order: number
 }

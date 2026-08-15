@@ -13,7 +13,7 @@ export const PRODUCT_FIELDS = [
   'description', 'short_description',
   'price', 'regular_price',
   'manage_stock', 'stock_quantity', 'stock_status',
-  'categories', 'tags', 'images', 'attributes', 'variations',
+  'categories', 'tags', 'brands', 'images', 'attributes', 'variations',
   'menu_order', 'total_sales',
   'date_created', 'date_modified',
 ] as const
@@ -21,6 +21,11 @@ export const PRODUCT_FIELDS = [
 export const CATEGORY_FIELDS = [
   'id', 'lang', 'translations',
   'name', 'slug', 'parent', 'description', 'menu_order', 'count',
+] as const
+
+export const BRAND_FIELDS = [
+  'id', 'lang', 'translations',
+  'name', 'slug', 'description', 'count',
 ] as const
 
 export const VARIATION_FIELDS = [

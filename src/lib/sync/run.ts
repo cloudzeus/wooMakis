@@ -1,10 +1,12 @@
 import { prisma } from '@/lib/prisma'
 import { pullCategories } from '@/lib/sync/categories'
+import { pullBrands } from '@/lib/sync/brands'
 import { linkProductImages, pullProducts } from '@/lib/sync/products'
 import { mirrorImages } from '@/lib/sync/mirror'
 
 export type FullPullResult = {
   categories: { created: number; updated: number }
+  brands: { created: number; updated: number }
   products: { created: number; updated: number }
   images: { mirrored: number; skipped: number; failed: number }
   links: { linked: number; unresolved: number }
@@ -18,7 +20,9 @@ export async function runFullPull({ withImages = true } = {}): Promise<FullPullR
   })
 
   try {
+    // Categories and brands first — products resolve their links against them.
     const categories = await pullCategories()
+    const brands = await pullBrands()
     const products = await pullProducts()
     const images = withImages
       ? await mirrorImages(products.imageUrls)
@@ -33,13 +37,13 @@ export async function runFullPull({ withImages = true } = {}): Promise<FullPullR
       data: {
         outcome: images.failed > 0 ? 'PARTIAL' : 'SUCCESS',
         finishedAt: new Date(),
-        created: categories.created + products.created,
-        updated: categories.updated + products.updated,
+        created: categories.created + brands.created + products.created,
+        updated: categories.updated + brands.updated + products.updated,
         skipped: images.skipped,
         failed: images.failed,
       },
     })
-    return { categories, products, images, links }
+    return { categories, brands, products, images, links }
   } catch (err) {
     await prisma.syncLog.update({
       where: { id: log.id },

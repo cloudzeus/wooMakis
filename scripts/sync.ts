@@ -7,6 +7,7 @@ const withImages = !process.argv.includes('--no-images')
 runFullPull({ withImages })
   .then(r => {
     console.log('Κατηγορίες:', r.categories)
+    console.log('Μάρκες:    ', r.brands)
     console.log('Προϊόντα:  ', r.products)
     console.log('Εικόνες:   ', r.images)
     console.log('Συνδέσεις: ', r.links)

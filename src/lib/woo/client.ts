@@ -1,5 +1,5 @@
-import { CATEGORY_FIELDS, PRODUCT_FIELDS, VARIATION_FIELDS, fieldParam } from '@/lib/woo/fields'
-import type { WooCategory, WooProduct, WooVariation } from '@/lib/woo/types'
+import { BRAND_FIELDS, CATEGORY_FIELDS, PRODUCT_FIELDS, VARIATION_FIELDS, fieldParam } from '@/lib/woo/fields'
+import type { WooBrand, WooCategory, WooProduct, WooVariation } from '@/lib/woo/types'
 
 export class WooHttpError extends Error {
   constructor(readonly status: number, readonly url: string, readonly body: string) {
@@ -60,6 +60,10 @@ export function listCategories(opts?: ListOptions): Promise<WooCategory[]> {
 
 export function listProducts(opts?: ListOptions): Promise<WooProduct[]> {
   return listAll<WooProduct>('products', PRODUCT_FIELDS, opts)
+}
+
+export function listBrands(opts?: ListOptions): Promise<WooBrand[]> {
+  return listAll<WooBrand>('products/brands', BRAND_FIELDS, opts)
 }
 
 export function listVariations(productId: number, opts?: ListOptions): Promise<WooVariation[]> {
