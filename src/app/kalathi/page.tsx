@@ -9,7 +9,7 @@ export default async function CartPage() {
   const cart = await readCart('el')
 
   return (
-    <div className="min-h-screen bg-white text-[#0f2429]">
+    <div className="min-h-screen bg-white font-store text-[#0f2429]">
       <header className="border-b border-black/5">
         <div className="mx-auto flex h-16 max-w-5xl items-center justify-between px-5">
           <Link href="/">
