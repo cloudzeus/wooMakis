@@ -245,6 +245,12 @@ export async function pullProducts(): Promise<ProductPullResult> {
  */
 export async function linkProductImages(
   imagesByProduct: Map<string, { src: string; alt: string | null }[]>,
+  /**
+   * Optional source-url to asset-id map from mirrorImages. Without it, a product
+   * whose photo is byte-identical to another product's cannot be linked: the
+   * asset is stored once, under the FIRST url, so the second never matches.
+   */
+  resolved?: Map<string, string>,
 ): Promise<{ linked: number; unresolved: number }> {
   const allSrcs = [...new Set([...imagesByProduct.values()].flat().map(i => i.src))]
   const assets = await prisma.mediaAsset.findMany({
@@ -252,6 +258,9 @@ export async function linkProductImages(
     select: { id: true, sourceUrl: true },
   })
   const assetIdBySrc = new Map(assets.map(a => [a.sourceUrl, a.id]))
+  for (const [src, id] of resolved ?? []) {
+    if (!assetIdBySrc.has(src)) assetIdBySrc.set(src, id)
+  }
 
   let linked = 0
   let unresolved = 0

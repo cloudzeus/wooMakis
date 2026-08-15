@@ -1,84 +1,78 @@
 'use client'
 
 import { useMemo, useState, useTransition } from 'react'
-import { addLinesToCart, type EyeChoice, type LineSelection } from '@/app/kalathi/actions'
+import { addLinesToCart } from '@/app/kalathi/actions'
 import { CheckCircle, ICON_SM, Minus, Plus, WarningCircle } from './icons'
-import { EYE_LABEL, EYE_SHORT, splitAttributes } from '@/lib/lens-attributes'
-import { CREAM, HAIRLINE, INK, INK_FAINT, INK_MUTED, R_INNER, SURFACE, TEAL, TEAL_DEEP } from './tokens'
+import { EYE_SHORT, attrLabel, eyeAttrKey, splitAttributes } from '@/lib/lens-attributes'
+import { CREAM, HAIRLINE, INK, INK_FAINT, INK_MUTED, SURFACE, TEAL, TEAL_DEEP } from './tokens'
 import type { StoreProduct } from './types'
 
-type EyeState = {
-  enabled: boolean
-  quantity: number
-  selections: Record<string, string>
-}
-
 /**
- * Per-eye lens selection.
+ * Lens selection for a pair.
  *
- * Contact lenses are prescribed separately for each eye and the two powers
- * usually differ, so this is two independent selections that produce two cart
- * lines, not one line with a quantity of two.
+ * A pair is ONE product with two dimensions, one per eye, not two separately
+ * charged items. So this produces a single cart line whose selections carry both
+ * eyes, and the quantity counts pairs.
  *
- * Either eye can be switched off: buying for one eye only is normal, whether
- * because the prescription differs or because only one lens was lost.
+ * The two powers usually match, so mirroring is the default; unticking it is
+ * what makes a different power per eye possible.
  */
 export function EyePicker({ product }: { product: StoreProduct }) {
-  const { perEye, fixed } = useMemo(
+  const { perEye, choices, fixed } = useMemo(
     () => splitAttributes(product.attributes),
     [product.attributes],
   )
 
-  const blank = (): EyeState => ({
-    enabled: true,
-    quantity: 1,
-    selections: Object.fromEntries(perEye.map(a => [a.name, ''])),
-  })
-
-  const [right, setRight] = useState<EyeState>(blank)
-  const [left, setLeft] = useState<EyeState>(blank)
+  const [right, setRight] = useState<Record<string, string>>({})
+  const [left, setLeft] = useState<Record<string, string>>({})
+  /** Single selections for the whole product, e.g. hat size. */
+  const [picked, setPicked] = useState<Record<string, string>>({})
   const [mirror, setMirror] = useState(true)
+  const [pairs, setPairs] = useState(1)
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null)
   const [pending, start] = useTransition()
 
   const out = product.stockStatus !== 'instock'
 
-  function updateRight(next: EyeState) {
+  function updateRight(attr: string, value: string) {
+    const next = { ...right, [attr]: value }
     setRight(next)
-    // Most prescriptions are the same in both eyes, so mirroring is the useful
-    // default; unticking it is what makes different powers possible.
-    if (mirror) setLeft({ ...next, quantity: next.quantity })
+    if (mirror) setLeft(next)
   }
 
-  const active = [
-    right.enabled ? ({ eye: 'RIGHT', state: right } as const) : null,
-    left.enabled ? ({ eye: 'LEFT', state: left } as const) : null,
-  ].filter(Boolean) as { eye: EyeChoice; state: EyeState }[]
-
-  const missing = active.filter(a =>
-    perEye.some(attr => !a.state.selections[attr.name]),
-  )
-  const canAdd = active.length > 0 && missing.length === 0 && !out
+  const complete =
+    perEye.every(a => right[a.name] && left[a.name]) &&
+    choices.every(a => picked[a.name])
+  const canAdd = complete && !out
 
   function submit() {
-    const lines: LineSelection[] = active.map(a => ({
-      eye: a.eye,
-      selections: a.state.selections,
-      quantity: a.state.quantity,
-    }))
+    // One line. Both eyes live in its selections, keyed so the order shows
+    // which power belongs to which eye.
+    const selections: Record<string, string> = {}
+    for (const a of perEye) {
+      selections[eyeAttrKey(a.name, 'RIGHT')] = right[a.name]
+      selections[eyeAttrKey(a.name, 'LEFT')] = left[a.name]
+    }
+    for (const a of choices) {
+      selections[attrLabel(a.name)] = picked[a.name]
+    }
+
     start(async () => {
-      const r = await addLinesToCart(product.id, lines)
+      const r = await addLinesToCart(product.id, [
+        { eye: 'BOTH', selections, quantity: pairs },
+      ])
       setMsg(r.ok
-        ? { ok: true, text: `Προστέθηκαν στο καλάθι (${r.itemCount} προϊόντα).` }
+        ? { ok: true, text: `Προστέθηκε στο καλάθι (${r.itemCount} στο σύνολο).` }
         : { ok: false, text: r.error })
     })
   }
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between gap-3">
+      {perEye.length > 0 && (
+      <div className="flex flex-wrap items-center justify-between gap-2">
         <h2 className="text-[11px] font-bold uppercase tracking-[0.14em]" style={{ color: INK_MUTED }}>
-          Επιλογή ανά μάτι
+          Βαθμός ανά μάτι
         </h2>
         <label className="flex cursor-pointer items-center gap-2 text-[12.5px]" style={{ color: INK_MUTED }}>
           <input
@@ -86,35 +80,60 @@ export function EyePicker({ product }: { product: StoreProduct }) {
             checked={mirror}
             onChange={e => {
               setMirror(e.target.checked)
-              if (e.target.checked) setLeft({ ...right })
+              if (e.target.checked) setLeft(right)
             }}
           />
-          Ίδιος βαθμός και στα δύο μάτια
+          Ίδιος και στα δύο μάτια
         </label>
       </div>
+      )}
 
+      {perEye.length > 0 && (
       <div className="grid gap-3 sm:grid-cols-2">
-        <EyeCard
-          eye="RIGHT" state={right} attrs={perEye} disabled={out}
-          onChange={updateRight}
+        <EyeColumn
+          eye="RIGHT" label="Δεξί μάτι" values={right} attrs={perEye}
+          disabled={out} onChange={updateRight}
         />
-        <EyeCard
-          eye="LEFT" state={left} attrs={perEye} disabled={out || mirror}
-          hint={mirror ? 'Ακολουθεί το δεξί μάτι' : undefined}
-          onChange={setLeft}
+        <EyeColumn
+          eye="LEFT" label="Αριστερό μάτι" values={left} attrs={perEye}
+          disabled={out || mirror}
+          hint={mirror ? 'Ακολουθεί το δεξί' : undefined}
+          onChange={(attr, v) => setLeft(p => ({ ...p, [attr]: v }))}
         />
       </div>
+      )}
+
+      {/* Single selections for the whole product, e.g. hat size. */}
+      {choices.map(a => (
+        <label key={a.name} className="block">
+          <span className="mb-1.5 block text-[11px] font-bold uppercase tracking-[0.13em]" style={{ color: INK_MUTED }}>
+            {attrLabel(a.name)}
+          </span>
+          <select
+            value={picked[a.name] ?? ''}
+            disabled={out}
+            onChange={e => setPicked(p => ({ ...p, [a.name]: e.target.value }))}
+            className="h-12 w-full cursor-pointer rounded-full border px-5 text-[14px] outline-none disabled:cursor-not-allowed"
+            style={{
+              borderColor: picked[a.name] ? TEAL : HAIRLINE,
+              background: SURFACE,
+              color: INK,
+            }}
+          >
+            <option value="">Επίλεξε {attrLabel(a.name).toLowerCase()}…</option>
+            {a.options.map(o => <option key={o} value={o}>{o}</option>)}
+          </select>
+        </label>
+      ))}
 
       {fixed.length > 0 && (
         <dl className="flex flex-wrap gap-x-6 gap-y-2 rounded-2xl p-4" style={{ background: CREAM }}>
           {fixed.map(a => (
             <div key={a.name} className="flex items-baseline gap-2">
               <dt className="text-[11px] uppercase tracking-[0.1em]" style={{ color: INK_MUTED }}>
-                {a.name.replace(/^Ιδιότητα\s*[-–]\s*/, '')}
+                {attrLabel(a.name)}
               </dt>
-              <dd className="text-[13px] font-semibold" style={{ color: INK }}>
-                {a.options.join(', ')}
-              </dd>
+              <dd className="text-[13px] font-semibold" style={{ color: INK }}>{a.options.join(', ')}</dd>
             </div>
           ))}
         </dl>
@@ -133,80 +152,81 @@ export function EyePicker({ product }: { product: StoreProduct }) {
         </p>
       )}
 
-      <button
-        onClick={submit}
-        disabled={pending || !canAdd}
-        className="h-13 w-full cursor-pointer rounded-full py-4 text-[14px] font-bold transition-transform disabled:opacity-40 motion-safe:enabled:hover:-translate-y-0.5"
-        style={{ background: INK, color: SURFACE }}
-      >
-        {pending
-          ? 'Προσθήκη…'
-          : out
-            ? 'Εξαντλημένο'
-            : active.length === 0
-              ? 'Διάλεξε τουλάχιστον ένα μάτι'
-              : missing.length > 0
-                ? 'Συμπλήρωσε τις επιλογές'
-                : `Προσθήκη στο καλάθι (${active.length === 2 ? '2 κουτιά' : '1 κουτί'})`}
-      </button>
+      <div className="flex items-center gap-3">
+        <div className="flex items-center rounded-full border" style={{ borderColor: HAIRLINE }}>
+          <button
+            type="button"
+            onClick={() => setPairs(q => Math.max(1, q - 1))}
+            aria-label="Μείωση ποσότητας"
+            className="grid h-12 w-12 cursor-pointer place-items-center rounded-full hover:bg-black/5"
+          >
+            <Minus size={ICON_SM} />
+          </button>
+          <span className="w-9 text-center text-[15px] tabular-nums">{pairs}</span>
+          <button
+            type="button"
+            onClick={() => setPairs(q => Math.min(99, q + 1))}
+            aria-label="Αύξηση ποσότητας"
+            className="grid h-12 w-12 cursor-pointer place-items-center rounded-full hover:bg-black/5"
+          >
+            <Plus size={ICON_SM} />
+          </button>
+        </div>
 
-      <p className="text-center text-[12px]" style={{ color: INK_FAINT }}>
-        Κάθε μάτι χρεώνεται ξεχωριστά. Αν χρειάζεσαι φακό μόνο για το ένα,
-        ξετίκαρε το άλλο.
-      </p>
+        <button
+          onClick={submit}
+          disabled={pending || !canAdd}
+          className="h-12 flex-1 cursor-pointer rounded-full text-[14px] font-bold transition-transform disabled:opacity-40 motion-safe:enabled:hover:-translate-y-0.5"
+          style={{ background: INK, color: SURFACE }}
+        >
+          {pending
+            ? 'Προσθήκη…'
+            : out
+              ? 'Εξαντλημένο'
+              : !complete
+                ? 'Διάλεξε βαθμό και στα δύο μάτια'
+                : 'Προσθήκη στο καλάθι'}
+        </button>
+      </div>
     </div>
   )
 }
 
-function EyeCard({
-  eye, state, attrs, disabled, hint, onChange,
+function EyeColumn({
+  eye, label, values, attrs, disabled, hint, onChange,
 }: {
   eye: 'RIGHT' | 'LEFT'
-  state: EyeState
+  label: string
+  values: Record<string, string>
   attrs: { name: string; options: string[] }[]
   disabled?: boolean
   hint?: string
-  onChange: (s: EyeState) => void
+  onChange: (attr: string, value: string) => void
 }) {
   return (
     <div
-      className="rounded-2xl p-4 transition-opacity"
-      style={{
-        background: SURFACE,
-        border: `1px solid ${state.enabled ? HAIRLINE : 'transparent'}`,
-        opacity: state.enabled ? 1 : 0.5,
-      }}
+      className="rounded-2xl p-4"
+      style={{ background: SURFACE, border: `1px solid ${HAIRLINE}` }}
     >
-      <label className="flex cursor-pointer items-center justify-between gap-2">
-        <span className="flex items-baseline gap-2">
-          <span className="text-[14px] font-bold" style={{ color: INK }}>{EYE_LABEL[eye]}</span>
-          <span className="text-[11px] font-semibold" style={{ color: TEAL_DEEP }}>{EYE_SHORT[eye]}</span>
-        </span>
-        <input
-          type="checkbox"
-          checked={state.enabled}
-          onChange={e => onChange({ ...state, enabled: e.target.checked })}
-        />
-      </label>
-
-      {hint && <p className="mt-1 text-[11.5px]" style={{ color: INK_FAINT }}>{hint}</p>}
+      <p className="flex items-baseline gap-2">
+        <span className="text-[14px] font-bold" style={{ color: INK }}>{label}</span>
+        <span className="text-[11px] font-bold" style={{ color: TEAL_DEEP }}>{EYE_SHORT[eye]}</span>
+      </p>
+      {hint && <p className="mt-0.5 text-[11.5px]" style={{ color: INK_FAINT }}>{hint}</p>}
 
       <div className="mt-3 space-y-2.5">
         {attrs.map(a => (
           <label key={a.name} className="block">
             <span className="mb-1 block text-[10.5px] font-bold uppercase tracking-[0.1em]" style={{ color: INK_MUTED }}>
-              {a.name.replace(/^Ιδιότητα\s*[-–]\s*/, '')}
+              {attrLabel(a.name)}
             </span>
             <select
-              value={state.selections[a.name] ?? ''}
-              disabled={disabled || !state.enabled}
-              onChange={e => onChange({
-                ...state,
-                selections: { ...state.selections, [a.name]: e.target.value },
-              })}
-              className="h-11 w-full cursor-pointer rounded-full border px-4 text-[14px] tabular-nums outline-none disabled:cursor-not-allowed"
+              value={values[a.name] ?? ''}
+              disabled={disabled}
+              onChange={e => onChange(a.name, e.target.value)}
+              className="h-11 w-full cursor-pointer rounded-full border px-4 text-[14px] tabular-nums outline-none disabled:cursor-not-allowed disabled:opacity-70"
               style={{
-                borderColor: state.selections[a.name] ? TEAL : HAIRLINE,
+                borderColor: values[a.name] ? TEAL : HAIRLINE,
                 background: SURFACE,
                 color: INK,
               }}
@@ -216,31 +236,6 @@ function EyeCard({
             </select>
           </label>
         ))}
-
-        <div className="flex items-center justify-between pt-1">
-          <span className="text-[11.5px]" style={{ color: INK_MUTED }}>Κουτιά</span>
-          <div className="flex items-center rounded-full border" style={{ borderColor: HAIRLINE }}>
-            <button
-              type="button"
-              disabled={!state.enabled}
-              onClick={() => onChange({ ...state, quantity: Math.max(1, state.quantity - 1) })}
-              aria-label={`Μείωση για ${EYE_LABEL[eye]}`}
-              className="grid h-9 w-9 cursor-pointer place-items-center rounded-full hover:bg-black/5"
-            >
-              <Minus size={14} />
-            </button>
-            <span className="w-7 text-center text-[13px] tabular-nums">{state.quantity}</span>
-            <button
-              type="button"
-              disabled={!state.enabled}
-              onClick={() => onChange({ ...state, quantity: Math.min(99, state.quantity + 1) })}
-              aria-label={`Αύξηση για ${EYE_LABEL[eye]}`}
-              className="grid h-9 w-9 cursor-pointer place-items-center rounded-full hover:bg-black/5"
-            >
-              <Plus size={14} />
-            </button>
-          </div>
-        </div>
       </div>
     </div>
   )

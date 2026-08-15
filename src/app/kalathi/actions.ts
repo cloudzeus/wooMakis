@@ -11,7 +11,7 @@ export type EyeChoice = 'RIGHT' | 'LEFT' | 'BOTH'
 
 export type LineSelection = {
   eye: EyeChoice
-  /** Attribute name to chosen option, e.g. {"Ιδιότητα - Βαθμός": "-2.50"}. */
+  /** Eye-keyed choices, e.g. {"Βαθμός OD": "+2.00", "Βαθμός OS": "+3.50"}. */
   selections: Record<string, string>
   quantity: number
 }
@@ -19,11 +19,11 @@ export type LineSelection = {
 const MAX_QTY = 99
 
 /**
- * Adds one or more lines for a product.
+ * Adds lines for a product.
  *
- * Lenses arrive as two selections, one per eye, usually with different powers.
- * Each becomes its own cart line, keyed so that re-adding the same eye and power
- * increments rather than duplicating, while a different power stays separate.
+ * A pair of lenses is ONE line: both eyes live in its selections, keyed by eye
+ * (e.g. "Βαθμός OD" / "Βαθμός OS"), and the quantity counts pairs. Re-adding the
+ * same pair increments it; a different combination of powers is a separate line.
  */
 export async function addLinesToCart(
   productId: string,
@@ -39,15 +39,16 @@ export async function addLinesToCart(
   if (product.status !== 'publish') return { ok: false, error: 'Το προϊόν δεν είναι διαθέσιμο.' }
   if (product.stockStatus === 'outofstock') return { ok: false, error: 'Το προϊόν είναι εξαντλημένο.' }
 
-  // Reject a value that is not among the product's own options, so a tampered
-  // request cannot record a power this lens is not made in.
   const attrs = Array.isArray(product.attributes)
     ? (product.attributes as { name?: string; options?: string[] }[])
     : []
+  // Selection keys carry an eye suffix (e.g. "Βαθμός OD"), so match the value
+  // against any attribute whose options contain it rather than against an exact
+  // name. A tampered request still cannot record a power this lens is not made in.
+  const allOptions = new Set(attrs.flatMap(a => a.options ?? []))
   for (const line of lines) {
     for (const [name, value] of Object.entries(line.selections)) {
-      const attr = attrs.find(a => a.name === name)
-      if (!attr?.options?.includes(value)) {
+      if (!allOptions.has(value)) {
         return { ok: false, error: `Μη έγκυρη επιλογή για «${name}».` }
       }
     }

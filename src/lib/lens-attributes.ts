@@ -1,32 +1,42 @@
 /**
- * Which product attributes the customer chooses, and which are fixed facts.
+ * Sorts a product's attributes into what the customer chooses and how.
  *
- * Important: WooCommerce on mylens.gr models lens power as a plain attribute
- * with `variation: false`, not as a product variation. 110 products carry a
- * Βαθμός attribute this way but only 19 products have real variations. So there
- * is no variation id to select; the choice is carried to the order as line-item
- * meta instead. That also means power does not change price and has no
- * per-power stock.
+ * Three outcomes, and getting them apart matters:
+ *
+ *   perEye   prescription values, chosen twice (once per eye) - power,
+ *            cylinder, axis, addition, base curve, dominant eye
+ *   choices  one selection for the whole product - hat size, frame colour
+ *   fixed    a single option, so nothing to choose; shown as specification
+ *
+ * A product is treated as a lens only when it actually carries a prescription
+ * attribute. Without that test a hat's "Μέγεθος Καπέλου" would render as a
+ * left/right eye choice, which is how this was wrong first time round.
+ *
+ * Note on the data: mylens.gr models power as a plain attribute with
+ * variation:false, not as a WooCommerce variation. 109 products expose power
+ * this way while only 19 have real variations. So the choice cannot be sent as
+ * a variation id; it travels to the order as line-item meta instead, which also
+ * means power does not change price and has no per-power stock.
  */
 
-/** Attributes prescribed per eye. Matched loosely because Woo names carry a prefix. */
-const PER_EYE = [
-  'βαθμός',      // sphere / power
-  'κύλινδρος',   // cylinder, for toric lenses
-  'άξονας',      // axis, for toric lenses
-  'addition',    // for multifocal
-  'χρώμα',       // colour, for cosmetic lenses
+/** Prescription attributes: chosen separately for each eye. */
+const PRESCRIPTION = [
+  'βαθμός',            // sphere
+  'κύλινδρος',         // cylinder, toric
+  'άξονας',            // axis, toric
+  'addition',          // multifocal
+  'καμπυλότητα',       // base curve, varies on 16 products
+  'υπερέχων',          // dominant eye
 ]
 
-/** Attributes that describe the product, identical for both eyes. */
-const FIXED = ['καμπυλότητα', 'διάμετρος', 'διάρκεια', 'τύπος', 'υλικό', 'διαπερατότητα']
+/** Descriptive only, never a choice even when several values are listed. */
+const SPEC_ONLY = ['διάρκεια', 'τύπος', 'υλικό', 'διαπερατότητα', 'διάμετρος']
 
 export type ProductAttribute = { name: string; options: string[] }
 
 export type AttributeSplit = {
-  /** Choosable per eye, more than one option. */
   perEye: ProductAttribute[]
-  /** Shown as specification only. */
+  choices: ProductAttribute[]
   fixed: ProductAttribute[]
 }
 
@@ -39,32 +49,35 @@ function matches(name: string, list: string[]): boolean {
   return list.some(k => n.includes(normalise(k)))
 }
 
-/**
- * Splits a product's attributes into what the customer picks and what is simply
- * true of the product.
- *
- * A per-eye attribute with a single option is NOT a choice, so it moves to the
- * fixed list. That is what stops "Καμπυλότητα: 8.60" being rendered as a
- * dropdown with one entry.
- */
 export function splitAttributes(attributes: ProductAttribute[]): AttributeSplit {
+  const usable = attributes.filter(a => a.options?.length)
+
+  // Only a product carrying a real prescription attribute is a lens.
+  const isLens = usable.some(a => matches(a.name, PRESCRIPTION) && a.options.length > 1)
+
   const perEye: ProductAttribute[] = []
+  const choices: ProductAttribute[] = []
   const fixed: ProductAttribute[] = []
 
-  for (const a of attributes) {
-    if (!a.options?.length) continue
-    if (matches(a.name, PER_EYE) && a.options.length > 1) perEye.push(a)
-    else if (matches(a.name, FIXED) || a.options.length === 1) fixed.push(a)
-    else if (a.options.length > 1) perEye.push(a)
-    else fixed.push(a)
+  for (const a of usable) {
+    const single = a.options.length === 1
+    if (single || matches(a.name, SPEC_ONLY)) { fixed.push(a); continue }
+    if (isLens && matches(a.name, PRESCRIPTION)) perEye.push(a)
+    else choices.push(a)
   }
 
-  return { perEye, fixed }
+  return { perEye, choices, fixed }
 }
 
 /** True when this product needs a left/right choice rather than a single one. */
 export function needsPerEye(attributes: ProductAttribute[]): boolean {
   return splitAttributes(attributes).perEye.length > 0
+}
+
+/** True when the customer must pick something before this can be bought. */
+export function needsSelection(attributes: ProductAttribute[]): boolean {
+  const { perEye, choices } = splitAttributes(attributes)
+  return perEye.length > 0 || choices.length > 0
 }
 
 export const EYE_LABEL: Record<'RIGHT' | 'LEFT' | 'BOTH', string> = {
@@ -80,11 +93,25 @@ export const EYE_SHORT: Record<'RIGHT' | 'LEFT' | 'BOTH', string> = {
   BOTH: '',
 }
 
+/** Strips the "Ιδιότητα -" prefix WooCommerce puts on lens attributes. */
+export function attrLabel(name: string): string {
+  return name.replace(/^Ιδιότητα\s*[-–]\s*/, '').trim()
+}
+
 /**
- * Deterministic identity for a cart line: same product, same eye, same choices
- * collapses onto one row; a different power stays separate.
+ * Names a per-eye value inside a single line's selections.
  *
- * Keys are sorted so that {a,b} and {b,a} produce the same string.
+ * A pair is one product with two dimensions, so both eyes live in one line and
+ * the key must say which eye it belongs to. This string reaches the WooCommerce
+ * order as line-item meta, so it is written to be readable there.
+ */
+export function eyeAttrKey(attrName: string, eye: 'RIGHT' | 'LEFT'): string {
+  return `${attrLabel(attrName)} ${EYE_SHORT[eye]}`
+}
+
+/**
+ * Deterministic identity for a cart line: product plus the exact choices.
+ * Keys are sorted so {a,b} and {b,a} do not produce two rows for one selection.
  */
 export function buildLineKey(
   productId: string,

@@ -5,7 +5,7 @@ import Link from 'next/link'
 import { useState, useTransition } from 'react'
 import { addToCart } from '@/app/kalathi/actions'
 import { EyePicker } from '@/components/store/eye-picker'
-import { needsPerEye } from '@/lib/lens-attributes'
+import { needsSelection } from '@/lib/lens-attributes'
 import { ProductCard } from '@/components/store/product-card'
 import { QuickView } from '@/components/store/quick-view'
 import {
@@ -48,7 +48,9 @@ export function ProductView({
     ? paragraphs(product.description)
     : paragraphs(product.shortDescription)
 
-  const perEye = needsPerEye(product.attributes)
+    // Any product with something to choose uses the picker, not just lenses:
+  // a hat needs its size selected before it can be bought.
+  const perEye = needsSelection(product.attributes)
 
   const discount =
     product.onSale && product.regularPrice && product.price

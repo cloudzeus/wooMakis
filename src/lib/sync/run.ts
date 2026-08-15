@@ -26,11 +26,11 @@ export async function runFullPull({ withImages = true } = {}): Promise<FullPullR
     const products = await pullProducts()
     const images = withImages
       ? await mirrorImages(products.imageUrls)
-      : { mirrored: 0, skipped: 0, failed: 0 }
+      : { mirrored: 0, skipped: 0, failed: 0, resolved: new Map<string, string>() }
 
     // Always relink, even when mirroring was skipped — assets from an earlier
     // run are already present and the products still need their links.
-    const links = await linkProductImages(products.imagesByProduct)
+    const links = await linkProductImages(products.imagesByProduct, images.resolved)
 
     await prisma.syncLog.update({
       where: { id: log.id },
