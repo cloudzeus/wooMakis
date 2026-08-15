@@ -7,6 +7,7 @@
     "build": "next build",
     "start": "next start",
     "test": "vitest run --passWithNoTests",
+    "sync": "tsx scripts/sync.ts",
     "db:migrate": "prisma migrate dev",
     "db:seed": "tsx prisma/seed.ts",
     "db:sync-permissions": "tsx prisma/sync-permissions.ts"
@@ -30,6 +31,7 @@
     "react-dom": "19.2.8",
     "react-icons": "^5.7.0",
     "shadcn": "^4.18.0",
+    "sharp": "^0.35.3",
     "sonner": "^2.0.8",
     "tailwind-merge": "^3.6.0",
     "tw-animate-css": "^1.4.0",
